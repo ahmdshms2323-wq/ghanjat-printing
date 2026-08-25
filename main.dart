@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+package 'package:flutter/material.dart';
 
 void main() {
-  runApp(const GhanjatApp());
+  runApp(constflutter/material
 }
 
 class GhanjatApp extends StatelessWidget {
