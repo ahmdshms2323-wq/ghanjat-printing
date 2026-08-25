@@ -6,11 +6,32 @@ workflows:
       flutter: stable
 
     scripts:
-      - name: Create missing Flutter structure
+      - name: Prepare project
         script: |
           if [ ! -d "android" ]; then
             flutter create --platforms=android .
           fi
+
+          cat > pubspec.yaml <<'PUBSPEC'
+          name: ghanjat_printing
+          description: Ghanjat Printing
+          publish_to: "none"
+          version: 1.0.0+1
+
+          environment:
+            sdk: ">=3.0.0 <4.0.0"
+
+          dependencies:
+            flutter:
+              sdk: flutter
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+
+          flutter:
+            uses-material-design: true
+          PUBSPEC
 
           mkdir -p lib
 
@@ -66,11 +87,7 @@ workflows:
                         ),
                         child: const Column(
                           children: [
-                            Icon(
-                              Icons.print,
-                              size: 65,
-                              color: Colors.white,
-                            ),
+                            Icon(Icons.print, size: 65, color: Colors.white),
                             SizedBox(height: 10),
                             Text(
                               'غنجات',
@@ -98,37 +115,11 @@ workflows:
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      const Card(
-                        child: ListTile(
-                          leading: Icon(Icons.credit_card),
-                          title: Text('بزنس كارد'),
-                        ),
-                      ),
-                      const Card(
-                        child: ListTile(
-                          leading: Icon(Icons.label),
-                          title: Text('استيكرات منتجات'),
-                        ),
-                      ),
-                      const Card(
-                        child: ListTile(
-                          leading: Icon(Icons.shopping_bag),
-                          title: Text('أكياس بلاستيك وقماش'),
-                        ),
-                      ),
-                      const Card(
-                        child: ListTile(
-                          leading: Icon(Icons.image),
-                          title: Text('لوحات إعلانية بكل الخامات'),
-                        ),
-                      ),
-                      const Card(
-                        child: ListTile(
-                          leading: Icon(Icons.text_fields),
-                          title: Text('حروف بارزة'),
-                        ),
-                      ),
+                      const Card(child: ListTile(title: Text('بزنس كارد'))),
+                      const Card(child: ListTile(title: Text('استيكرات منتجات'))),
+                      const Card(child: ListTile(title: Text('أكياس بلاستيك وقماش'))),
+                      const Card(child: ListTile(title: Text('لوحات إعلانية'))),
+                      const Card(child: ListTile(title: Text('حروف بارزة'))),
                       const SizedBox(height: 20),
                       Container(
                         padding: const EdgeInsets.all(20),
@@ -149,17 +140,11 @@ workflows:
                             SizedBox(height: 10),
                             Text(
                               '0994482612',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                              ),
+                              style: TextStyle(color: Colors.white, fontSize: 20),
                             ),
                             Text(
                               '0115494130',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                              ),
+                              style: TextStyle(color: Colors.white, fontSize: 20),
                             ),
                           ],
                         ),
