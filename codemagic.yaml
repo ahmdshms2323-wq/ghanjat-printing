@@ -1,19 +1,514 @@
 workflows:
   android-apk:
-    name: Ghanjat Android APK
+    name: Ghanjat Android APK V2
     max_build_duration: 30
 
     environment:
       flutter: stable
 
     scripts:
-      - name: Prepare Flutter project
+      - name: Create and build Ghanjat
         script: |
-          flutter pub get
+          rm -rf android lib ios web linux macos windows test
 
-      - name: Build Android APK
-        script: |
-          flutter build apk --debug
+          flutter create --platforms=android --project-name ghanjat_printing .
 
-    artifacts:
-      - build/app/outputs/flutter-apk/app-debug.apk
+          cat > pubspec.yaml <<'PUBSPEC'
+          name: ghanjat_printing
+          description: Ghanjat Printing App
+          publish_to: "none"
+          version: 2.0.0+2
+
+          environment:
+            sdk: ">=3.0.0 <4.0.0"
+
+          dependencies:
+            flutter:
+              sdk: flutter
+            sqflite: ^2.3.3+1
+            path: ^1.9.0
+            url_launcher: ^6.3.0
+            font_awesome_flutter: ^10.7.0
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+
+          flutter:
+            uses-material-design: true
+          PUBSPEC
+
+          mkdir -p lib
+
+          cat > lib/main.dart <<'DART'
+          import 'package:flutter/material.dart';
+          import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+          import 'package:path/path.dart';
+          import 'package:sqflite/sqflite.dart';
+          import 'package:url_launcher/url_launcher.dart';
+
+          void main() {
+            WidgetsFlutterBinding.ensureInitialized();
+            runApp(const GhanjatApp());
+          }
+
+          class GhanjatApp extends StatelessWidget {
+            const GhanjatApp({super.key});
+
+            static const teal = Color(0xFF69A9A0);
+            static const purple = Color(0xFF3D2B63);
+
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                title: 'غنجات للطباعة',
+                theme: ThemeData(
+                  useMaterial3: true,
+                  scaffoldBackgroundColor: const Color(0xFFF5F6F8),
+                  colorScheme: ColorScheme.fromSeed(seedColor: teal),
+                  inputDecorationTheme: InputDecorationTheme(
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                home: const Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: HomePage(),
+                ),
+              );
+            }
+          }
+
+          class AppDB {
+            static Database? databaseInstance;
+
+            static Future<Database> get database async {
+              if (databaseInstance != null) return databaseInstance!;
+
+              final dbPath = join(
+                await getDatabasesPath(),
+                'ghanjat_orders.db',
+              );
+
+              databaseInstance = await openDatabase(
+                dbPath,
+                version: 1,
+                onCreate: (db, version) async {
+                  await db.execute('''
+                    CREATE TABLE orders(
+                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      customer TEXT NOT NULL,
+                      phone TEXT,
+                      service TEXT NOT NULL,
+                      quantity INTEGER NOT NULL,
+                      total REAL NOT NULL,
+                      paid REAL NOT NULL,
+                      status TEXT NOT NULL,
+                      notes TEXT
+                    )
+                  ''');
+                },
+              );
+
+              return databaseInstance!;
+            }
+
+            static Future<void> addOrder(Map<String, dynamic> data) async {
+              final db = await database;
+              await db.insert('orders', data);
+            }
+
+            static Future<List<Map<String, dynamic>>> getOrders() async {
+              final db = await database;
+              return db.query('orders', orderBy: 'id DESC');
+            }
+          }
+
+          class HomePage extends StatefulWidget {
+            const HomePage({super.key});
+
+            @override
+            State<HomePage> createState() => _HomePageState();
+          }
+
+          class _HomePageState extends State<HomePage> {
+            int page = 0;
+            List<Map<String, dynamic>> orders = [];
+            bool loading = true;
+
+            @override
+            void initState() {
+              super.initState();
+              loadOrders();
+            }
+
+            Future<void> loadOrders() async {
+              final data = await AppDB.getOrders();
+
+              if (!mounted) return;
+
+              setState(() {
+                orders = data;
+                loading = false;
+              });
+            }
+
+            void openNewOrder([String? service]) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: NewOrderPage(
+                      service: service,
+                      onSaved: loadOrders,
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              final screens = [
+                Dashboard(
+                  orders: orders,
+                  onAdd: () => openNewOrder(),
+                  onService: openNewOrder,
+                ),
+                OrdersPage(orders: orders),
+                CustomersPage(orders: orders),
+                const MorePage(),
+              ];
+
+              return Scaffold(
+                body: SafeArea(
+                  child: loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : screens[page],
+                ),
+                floatingActionButton: FloatingActionButton(
+                  backgroundColor: GhanjatApp.purple,
+                  foregroundColor: Colors.white,
+                  onPressed: () => openNewOrder(),
+                  child: const Icon(Icons.add),
+                ),
+                floatingActionButtonLocation:
+                    FloatingActionButtonLocation.centerDocked,
+                bottomNavigationBar: NavigationBar(
+                  selectedIndex: page,
+                  onDestinationSelected: (value) {
+                    setState(() {
+                      page = value;
+                    });
+                  },
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.home_outlined),
+                      selectedIcon: Icon(Icons.home),
+                      label: 'الرئيسية',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.receipt_long_outlined),
+                      selectedIcon: Icon(Icons.receipt_long),
+                      label: 'الطلبات',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.people_outline),
+                      selectedIcon: Icon(Icons.people),
+                      label: 'العملاء',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.grid_view_outlined),
+                      selectedIcon: Icon(Icons.grid_view),
+                      label: 'المزيد',
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+
+          class Dashboard extends StatelessWidget {
+            final List<Map<String, dynamic>> orders;
+            final VoidCallback onAdd;
+            final ValueChanged<String> onService;
+
+            const Dashboard({
+              super.key,
+              required this.orders,
+              required this.onAdd,
+              required this.onService,
+            });
+
+            @override
+            Widget build(BuildContext context) {
+              double sales = 0;
+              double remaining = 0;
+
+              for (final order in orders) {
+                final total = (order['total'] as num? ?? 0).toDouble();
+                final paid = (order['paid'] as num? ?? 0).toDouble();
+
+                sales += total;
+
+                if (total > paid) {
+                  remaining += total - paid;
+                }
+              }
+
+              return ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: GhanjatApp.teal,
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: const Column(
+                      children: [
+                        Icon(Icons.print, color: Colors.white, size: 58),
+                        SizedBox(height: 6),
+                        Text(
+                          'غنجات',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 34,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'لخدمات الطباعة',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  FilledButton.icon(
+                    onPressed: onAdd,
+                    icon: const Icon(Icons.add_circle_outline),
+                    label: const Text('إضافة طلب جديد'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: GhanjatApp.purple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.all(15),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    'خدماتنا',
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  service('بنر', Icons.panorama_horizontal_outlined),
+                  service('بزنس كارد', Icons.credit_card_outlined),
+                  service('استيكرات منتجات', Icons.sell_outlined),
+                  service('أكياس بلاستيك وقماش', Icons.shopping_bag_outlined),
+                  service('لوحات إعلانية', Icons.view_quilt_outlined),
+                  service('حروف بارزة', Icons.text_fields),
+
+                  const SizedBox(height: 20),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: summary(
+                          'الطلبات',
+                          '${orders.length}',
+                          Icons.receipt_long_outlined,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: summary(
+                          'المتبقي',
+                          '${remaining.toStringAsFixed(0)} ج',
+                          Icons.account_balance_wallet_outlined,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    'أحدث الطلبات',
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  if (orders.isEmpty)
+                    const Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text(
+                          'لا توجد طلبات حتى الآن',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+
+                  ...orders.take(4).map(
+                    (order) => OrderCard(order: order),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const ContactBox(),
+
+                  const SizedBox(height: 15),
+
+                  Text(
+                    'إجمالي المبيعات: ${sales.toStringAsFixed(0)} جنيه',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+
+                  const SizedBox(height: 80),
+                ],
+              );
+            }
+
+            Widget service(String name, IconData icon) {
+              return Card(
+                elevation: 0,
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFFEAF5F3),
+                    child: Icon(icon, color: GhanjatApp.purple),
+                  ),
+                  title: Text(name),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: () => onService(name),
+                ),
+              );
+            }
+
+            Widget summary(String title, String value, IconData icon) {
+              return Card(
+                elevation: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    children: [
+                      Icon(icon, color: GhanjatApp.teal),
+                      const SizedBox(height: 7),
+                      Text(title),
+                      Text(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+
+          class NewOrderPage extends StatefulWidget {
+            final String? service;
+            final Future<void> Function() onSaved;
+
+            const NewOrderPage({
+              super.key,
+              this.service,
+              required this.onSaved,
+            });
+
+            @override
+            State<NewOrderPage> createState() => _NewOrderPageState();
+          }
+
+          class _NewOrderPageState extends State<NewOrderPage> {
+            final formKey = GlobalKey<FormState>();
+
+            final customer = TextEditingController();
+            final phone = TextEditingController();
+            final quantity = TextEditingController(text: '1');
+            final total = TextEditingController(text: '0');
+            final paid = TextEditingController(text: '0');
+            final notes = TextEditingController();
+
+            late String selectedService;
+            String status = 'جديد';
+
+            @override
+            void initState() {
+              super.initState();
+              selectedService = widget.service ?? 'بنر';
+            }
+
+            double get totalValue =>
+                double.tryParse(total.text) ?? 0;
+
+            double get paidValue =>
+                double.tryParse(paid.text) ?? 0;
+
+            double get balance =>
+                totalValue > paidValue ? totalValue - paidValue : 0;
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('طلب جديد'),
+                ),
+                body: Form(
+                  key: formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      field(
+                        customer,
+                        'اسم العميل',
+                        Icons.person_outline,
+                        isRequired: true,
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      field(
+                        phone,
+                        'رقم الهاتف',
+                        Icons.phone_outlined,
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      DropdownButtonFormField<String>(
+                        value: selectedService,
+                        decoration: const InputDecoration(
+                          labelText: 'نوع الخدمة',
+                          prefixIcon: Icon(Icons.print_outlined),
+                        ),
+                        items: const [
+                          'بنر',
+                          'بزنس كارد',
+                          'استيكرات منتجات',
+                          'أكياس بلاستيك وقماش',
+                          'لوحات إعلانية',
+                         
