@@ -7,9 +7,38 @@ workflows:
       flutter: stable
 
     scripts:
-      - name: Prepare Android project
+      - name: Prepare Ghanjat project
         script: |
-          flutter create --platforms=android --project-name ghanjat_printing .
+          cp lib/main.dart /tmp/ghanjat_main.dart
+
+          if [ ! -d "android" ]; then
+            flutter create --platforms=android --project-name ghanjat_printing .
+          fi
+
+          mkdir -p lib
+          cp /tmp/ghanjat_main.dart lib/main.dart
+
+          cat > pubspec.yaml <<'PUBSPEC'
+          name: ghanjat_printing
+          description: Ghanjat Printing App
+          publish_to: "none"
+          version: 1.0.0+1
+
+          environment:
+            sdk: ">=3.0.0 <4.0.0"
+
+          dependencies:
+            flutter:
+              sdk: flutter
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+
+          flutter:
+            uses-material-design: true
+          PUBSPEC
+
           flutter pub get
 
       - name: Build Android APK
