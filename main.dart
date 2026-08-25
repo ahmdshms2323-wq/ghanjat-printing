@@ -1,11 +1,11 @@
-package 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 void main() {
-  runApp(constflutter/material
+  runApp(const GhanjatApp());
 }
 
 class GhanjatApp extends StatelessWidget {
-  const GhanjatApp({super.key});
+  const GhanjatApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -13,10 +13,7 @@ class GhanjatApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'غنجات للطباعة',
       theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF432B70),
-        ),
+        primarySwatch: Colors.deepPurple,
       ),
       home: const HomePage(),
     );
@@ -24,7 +21,7 @@ class GhanjatApp extends StatelessWidget {
 }
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  const HomePage({Key? key}) : super(key: key);
 
   static const Color purple = Color(0xFF432B70);
   static const Color turquoise = Color(0xFF74B5AE);
@@ -42,7 +39,7 @@ class HomePage extends StatelessWidget {
             'لطلب هذه الخدمة تواصل معنا عبر واتساب.',
             textAlign: TextAlign.right,
           ),
-          actions: [
+          actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
@@ -78,13 +75,13 @@ class HomePage extends StatelessWidget {
             ),
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
+            children: <Widget>[
               Icon(
                 icon,
                 size: 30,
                 color: turquoise,
               ),
+              const SizedBox(width: 15),
               Expanded(
                 child: Text(
                   title,
@@ -102,27 +99,24 @@ class HomePage extends StatelessWidget {
   }
 
   Widget whatsappNumber(String number) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.chat,
-            color: Colors.green,
-            size: 28,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        const Icon(
+          Icons.chat,
+          color: Colors.greenAccent,
+          size: 28,
+        ),
+        const SizedBox(width: 10),
+        Text(
+          number,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 25,
+            fontWeight: FontWeight.w500,
           ),
-          const SizedBox(width: 10),
-          Text(
-            number,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 25,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -138,9 +132,7 @@ class HomePage extends StatelessWidget {
           centerTitle: true,
           title: const Text(
             'غنجات للطباعة',
-            style: TextStyle(
-              fontSize: 24,
-            ),
+            style: TextStyle(fontSize: 24),
           ),
         ),
         body: SafeArea(
@@ -148,7 +140,7 @@ class HomePage extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+              children: <Widget>[
                 Container(
                   padding: const EdgeInsets.symmetric(
                     vertical: 35,
@@ -159,7 +151,7 @@ class HomePage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(35),
                   ),
                   child: const Column(
-                    children: [
+                    children: <Widget>[
                       Icon(
                         Icons.print,
                         color: Colors.white,
@@ -207,7 +199,7 @@ class HomePage extends StatelessWidget {
                 serviceButton(
                   context,
                   'استيكرات منتجات',
-                  Icons.sell_outlined,
+                  Icons.label_outline,
                 ),
 
                 serviceButton(
@@ -240,7 +232,7 @@ class HomePage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: Column(
-                    children: [
+                    children: <Widget>[
                       const Text(
                         'تواصل معنا',
                         style: TextStyle(
