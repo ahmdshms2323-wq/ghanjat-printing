@@ -14,7 +14,6 @@ class GhanjatApp extends StatelessWidget {
       title: 'غنجات للطباعة',
       theme: ThemeData(
         primarySwatch: Colors.deepPurple,
-        fontFamily: 'sans',
       ),
       home: const HomePage(),
     );
@@ -46,196 +45,6 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget serviceCard(
-    BuildContext context,
-    String title,
-    String price,
-    IconData icon,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: lightBackground,
-        borderRadius: BorderRadius.circular(20),
-        elevation: 2,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            openService(context, title, price, icon);
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 18,
-              vertical: 17,
-            ),
-            child: Row(
-              children: <Widget>[
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0FAF8),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: turquoise,
-                    size: 30,
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        title,
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        price,
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          height: 1.5,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 19,
-                  color: Colors.black54,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void showNewOrder(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(28),
-        ),
-      ),
-      builder: (BuildContext sheetContext) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 25, 20, 30),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                const Text(
-                  'إضافة طلب جديد',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: purple,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'اختر الخدمة المطلوبة',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.black54,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                orderOption(
-                  sheetContext,
-                  context,
-                  'بزنس كارد',
-                  'اتجاه واحد: 30,000 ج\nاتجاهين: 35,000 ج',
-                  Icons.badge_outlined,
-                ),
-                orderOption(
-                  sheetContext,
-                  context,
-                  'استيكرات منتجات',
-                  '40,000 ج / متر',
-                  Icons.label_outline,
-                ),
-                orderOption(
-                  sheetContext,
-                  context,
-                  'أكياس بلاستيك',
-                  '25,000 ج / كيلو',
-                  Icons.shopping_bag_outlined,
-                ),
-                orderOption(
-                  sheetContext,
-                  context,
-                  'أكياس قماش',
-                  '80,000 ج / كيلو',
-                  Icons.shopping_bag,
-                ),
-                orderOption(
-                  sheetContext,
-                  context,
-                  'لوحات إعلانية',
-                  '35,000 ج / متر',
-                  Icons.campaign_outlined,
-                ),
-                orderOption(
-                  sheetContext,
-                  context,
-                  'كروت الفال',
-                  '100 كرت: 70,000 ج',
-                  Icons.style_outlined,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget orderOption(
-    BuildContext sheetContext,
-    BuildContext parentContext,
-    String title,
-    String price,
-    IconData icon,
-  ) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: turquoise,
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      subtitle: Text(price),
-      trailing: const Icon(Icons.arrow_back_ios_new, size: 16),
-      onTap: () {
-        Navigator.pop(sheetContext);
-        openService(parentContext, title, price, icon);
-      },
-    );
-  }
-
   Widget statisticBox(
     IconData icon,
     String title,
@@ -243,8 +52,11 @@ class HomePage extends StatelessWidget {
   ) {
     return Expanded(
       child: Container(
-        height: 120,
-        padding: const EdgeInsets.all(15),
+        height: 135,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 12,
+        ),
         decoration: BoxDecoration(
           color: lightBackground,
           borderRadius: BorderRadius.circular(20),
@@ -262,20 +74,22 @@ class HomePage extends StatelessWidget {
             Icon(
               icon,
               color: turquoise,
-              size: 29,
+              size: 28,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(
               title,
+              textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 16,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               value,
+              textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 21,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: purple,
               ),
@@ -286,12 +100,261 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  Widget serviceCard(
+    BuildContext context,
+    String title,
+    String price,
+    IconData icon,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: lightBackground,
+        borderRadius: BorderRadius.circular(20),
+        elevation: 2,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            openService(
+              context,
+              title,
+              price,
+              icon,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FAF8),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: turquoise,
+                    size: 29,
+                  ),
+                ),
+
+                const SizedBox(width: 14),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        title,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        price,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          height: 1.55,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                const Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 18,
+                  color: Colors.black54,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void showNewOrder(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(28),
+        ),
+      ),
+      builder: (BuildContext sheetContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  20,
+                  25,
+                  20,
+                  30,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Container(
+                      width: 50,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.black12,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    const Text(
+                      'إضافة طلب جديد',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: purple,
+                      ),
+                    ),
+
+                    const SizedBox(height: 5),
+
+                    const Text(
+                      'اختر الخدمة المطلوبة',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.black54,
+                      ),
+                    ),
+
+                    const SizedBox(height: 15),
+
+                    orderOption(
+                      sheetContext,
+                      context,
+                      'بزنس كارد',
+                      '100 كرت\nاتجاه واحد: 30,000 ج\nاتجاهين: 35,000 ج',
+                      Icons.badge_outlined,
+                    ),
+
+                    orderOption(
+                      sheetContext,
+                      context,
+                      'استيكرات منتجات',
+                      '40,000 ج / متر',
+                      Icons.label_outline,
+                    ),
+
+                    orderOption(
+                      sheetContext,
+                      context,
+                      'أكياس بلاستيك',
+                      '25,000 ج / كيلو',
+                      Icons.shopping_bag_outlined,
+                    ),
+
+                    orderOption(
+                      sheetContext,
+                      context,
+                      'أكياس قماش',
+                      '80,000 ج / كيلو',
+                      Icons.shopping_bag,
+                    ),
+
+                    orderOption(
+                      sheetContext,
+                      context,
+                      'لوحات إعلانية',
+                      '35,000 ج / متر',
+                      Icons.campaign_outlined,
+                    ),
+
+                    orderOption(
+                      sheetContext,
+                      context,
+                      'كروت الفال',
+                      '100 كرت: 70,000 ج',
+                      Icons.style_outlined,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget orderOption(
+    BuildContext sheetContext,
+    BuildContext parentContext,
+    String title,
+    String price,
+    IconData icon,
+  ) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 3,
+      ),
+      leading: Icon(
+        icon,
+        color: turquoise,
+        size: 28,
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 17,
+        ),
+      ),
+      subtitle: Text(
+        price,
+        style: const TextStyle(
+          height: 1.5,
+        ),
+      ),
+      trailing: const Icon(
+        Icons.arrow_back_ios_new,
+        size: 16,
+      ),
+      onTap: () {
+        Navigator.pop(sheetContext);
+
+        openService(
+          parentContext,
+          title,
+          price,
+          icon,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Colors.white,
+
         appBar: AppBar(
           backgroundColor: purple,
           foregroundColor: Colors.white,
@@ -304,15 +367,23 @@ class HomePage extends StatelessWidget {
             ),
           ),
         ),
+
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
+            padding: const EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              110,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
+
+                // شعار غنجات
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    vertical: 28,
+                    vertical: 27,
                     horizontal: 20,
                   ),
                   decoration: BoxDecoration(
@@ -324,9 +395,11 @@ class HomePage extends StatelessWidget {
                       Icon(
                         Icons.print,
                         color: Colors.white,
-                        size: 65,
+                        size: 62,
                       ),
+
                       SizedBox(height: 10),
+
                       Text(
                         'غنجات',
                         style: TextStyle(
@@ -335,7 +408,9 @@ class HomePage extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+
                       SizedBox(height: 4),
+
                       Text(
                         'لخدمات الطباعة',
                         style: TextStyle(
@@ -346,15 +421,21 @@ class HomePage extends StatelessWidget {
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 20),
+
+                // الإحصائيات
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     statisticBox(
                       Icons.receipt_long_outlined,
                       'الطلبات',
                       '0',
                     ),
+
                     const SizedBox(width: 12),
+
                     statisticBox(
                       Icons.account_balance_wallet_outlined,
                       'المتبقي',
@@ -362,7 +443,9 @@ class HomePage extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 28),
+
+                const SizedBox(height: 30),
+
                 const Text(
                   'خدماتنا',
                   style: TextStyle(
@@ -370,37 +453,44 @@ class HomePage extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const SizedBox(height: 16),
+
                 serviceCard(
                   context,
                   'بزنس كارد',
-                  '100 كرت\nاتجاه واحد: 30,000 ج  •  اتجاهين: 35,000 ج',
+                  '100 كرت\nاتجاه واحد: 30,000 ج\nاتجاهين: 35,000 ج',
                   Icons.badge_outlined,
                 ),
+
                 serviceCard(
                   context,
                   'استيكرات منتجات',
                   '40,000 ج / متر',
                   Icons.label_outline,
                 ),
+
                 serviceCard(
                   context,
                   'أكياس بلاستيك',
                   '25,000 ج / كيلو',
                   Icons.shopping_bag_outlined,
                 ),
+
                 serviceCard(
                   context,
                   'أكياس قماش',
                   '80,000 ج / كيلو',
                   Icons.shopping_bag,
                 ),
+
                 serviceCard(
                   context,
                   'لوحات إعلانية',
                   '35,000 ج / متر',
                   Icons.campaign_outlined,
                 ),
+
                 serviceCard(
                   context,
                   'كروت الفال',
@@ -411,13 +501,17 @@ class HomePage extends StatelessWidget {
             ),
           ),
         ),
+
         floatingActionButton: FloatingActionButton.extended(
           backgroundColor: purple,
           foregroundColor: Colors.white,
           onPressed: () {
             showNewOrder(context);
           },
-          icon: const Icon(Icons.add),
+          icon: const Icon(
+            Icons.add,
+            size: 28,
+          ),
           label: const Text(
             'طلب جديد',
             style: TextStyle(
@@ -426,6 +520,7 @@ class HomePage extends StatelessWidget {
             ),
           ),
         ),
+
         floatingActionButtonLocation:
             FloatingActionButtonLocation.centerFloat,
       ),
@@ -454,105 +549,119 @@ class ServicePage extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Colors.white,
+
         appBar: AppBar(
           backgroundColor: purple,
           foregroundColor: Colors.white,
           centerTitle: true,
           title: Text(title),
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              const SizedBox(height: 20),
-              Center(
-                child: Container(
-                  width: 145,
-                  height: 145,
+
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const SizedBox(height: 15),
+
+                Center(
+                  child: Container(
+                    width: 140,
+                    height: 140,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F8F7),
+                      borderRadius: BorderRadius.circular(35),
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 68,
+                      color: turquoise,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 25),
+
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                Container(
+                  padding: const EdgeInsets.all(22),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0F8F7),
-                    borderRadius: BorderRadius.circular(35),
+                    color: const Color(0xFFF8F4FA),
+                    borderRadius: BorderRadius.circular(22),
                   ),
-                  child: Icon(
-                    icon,
-                    size: 70,
-                    color: turquoise,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 25),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8F4FA),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Column(
-                  children: <Widget>[
-                    const Text(
-                      'السعر',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.black54,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      price,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        height: 1.6,
-                        fontWeight: FontWeight.bold,
-                        color: purple,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              SizedBox(
-                height: 60,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CAF50),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                  ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'سيتم ربط الطلب بالواتساب في الخطوة التالية',
-                          textAlign: TextAlign.center,
+                  child: Column(
+                    children: <Widget>[
+                      const Text(
+                        'السعر',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.black54,
                         ),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.chat),
-                  label: const Text(
-                    'اطلب عبر واتساب',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+
+                      const SizedBox(height: 8),
+
+                      Text(
+                        price,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 21,
+                          height: 1.6,
+                          fontWeight: FontWeight.bold,
+                          color: purple,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 35),
+
+                SizedBox(
+                  height: 60,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4CAF50),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'اضغط الطلب وسيتم إرساله عبر واتساب',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.chat),
+                    label: const Text(
+                      'اطلب عبر واتساب',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
+
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
