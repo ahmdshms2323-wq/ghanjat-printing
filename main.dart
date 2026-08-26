@@ -1,9 +1,8 @@
-
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +14,7 @@ class GhanjatApp extends StatelessWidget {
 
   static const Color purple = Color(0xFF432B70);
   static const Color turquoise = Color(0xFF74B5AE);
+  static const Color light = Color(0xFFF2F8F7);
 
   @override
   Widget build(BuildContext context) {
@@ -27,11 +27,15 @@ class GhanjatApp extends StatelessWidget {
       ),
       home: const Directionality(
         textDirection: TextDirection.rtl,
-        child: HomePage(),
+        child: MainPage(),
       ),
     );
   }
 }
+
+// =====================================================
+// قاعدة البيانات
+// =====================================================
 
 class AppDatabase {
   static Database? _database;
@@ -43,14 +47,15 @@ class AppDatabase {
 
     final String dbPath = join(
       await getDatabasesPath(),
-      'ghanjat_orders.db',
+      'ghanjat_orders_v2.db',
     );
 
     _database = await openDatabase(
       dbPath,
       version: 1,
       onCreate: (Database db, int version) async {
-        await db.execute('''
+        await db.execute(
+          '''
           CREATE TABLE orders(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer TEXT NOT NULL,
@@ -65,14 +70,15 @@ class AppDatabase {
             status TEXT NOT NULL,
             created_at TEXT NOT NULL
           )
-        ''');
+          ''',
+        );
       },
     );
 
     return _database!;
   }
 
-  static Future<int> addOrder(
+  static Future<int> insertOrder(
     Map<String, dynamic> order,
   ) async {
     final Database db = await database;
@@ -92,7 +98,7 @@ class AppDatabase {
     );
   }
 
-  static Future<void> updateStatus(
+  static Future<void> changeStatus(
     int id,
     String status,
   ) async {
@@ -108,9 +114,7 @@ class AppDatabase {
     );
   }
 
-  static Future<void> deleteOrder(
-    int id,
-  ) async {
+  static Future<void> deleteOrder(int id) async {
     final Database db = await database;
 
     await db.delete(
@@ -121,97 +125,89 @@ class AppDatabase {
   }
 }
 
+// =====================================================
+// الخدمات والأسعار
+// =====================================================
+
 class ServiceData {
   final String name;
   final IconData icon;
-  final String description;
   final String unit;
   final double price;
-  final bool isBusinessCard;
-  final bool isCardPack;
+  final bool businessCard;
+  final bool pack100;
 
   const ServiceData({
     required this.name,
     required this.icon,
-    required this.description,
     required this.unit,
     required this.price,
-    this.isBusinessCard = false,
-    this.isCardPack = false,
+    this.businessCard = false,
+    this.pack100 = false,
   });
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+const List<ServiceData> services = <ServiceData>[
+  ServiceData(
+    name: 'بزنس كارد',
+    icon: Icons.badge_outlined,
+    unit: '100 كرت',
+    price: 30000,
+    businessCard: true,
+    pack100: true,
+  ),
+  ServiceData(
+    name: 'استيكرات منتجات',
+    icon: Icons.label_outline,
+    unit: 'متر',
+    price: 40000,
+  ),
+  ServiceData(
+    name: 'أكياس بلاستيك',
+    icon: Icons.shopping_bag_outlined,
+    unit: 'كيلو',
+    price: 25000,
+  ),
+  ServiceData(
+    name: 'أكياس قماش',
+    icon: Icons.shopping_bag,
+    unit: 'كيلو',
+    price: 80000,
+  ),
+  ServiceData(
+    name: 'لوحات إعلانية',
+    icon: Icons.campaign_outlined,
+    unit: 'متر',
+    price: 35000,
+  ),
+  ServiceData(
+    name: 'كروت الفال',
+    icon: Icons.card_giftcard_outlined,
+    unit: '100 كرت',
+    price: 70000,
+    pack100: true,
+  ),
+];
+
+// =====================================================
+// الصفحة الرئيسية
+// =====================================================
+
+class MainPage extends StatefulWidget {
+  const MainPage({Key? key}) : super(key: key);
 
   @override
-  State<HomePage> createState() {
-    return _HomePageState();
+  State<MainPage> createState() {
+    return _MainPageState();
   }
 }
 
-class _HomePageState extends State<HomePage> {
-  int selectedPage = 0;
+class _MainPageState extends State<MainPage> {
+  int currentPage = 0;
+  bool loading = true;
 
   List<Map<String, dynamic>> orders =
       <Map<String, dynamic>>[];
-
-  bool loading = true;
-
-  static const List<ServiceData> services =
-      <ServiceData>[
-    ServiceData(
-      name: 'بزنس كارد',
-      icon: Icons.badge_outlined,
-      description:
-          'تصميم وطباعة بزنس كارد احترافي.',
-      unit: 'حزمة 100 كرت',
-      price: 30000,
-      isBusinessCard: true,
-      isCardPack: true,
-    ),
-    ServiceData(
-      name: 'استيكرات منتجات',
-      icon: Icons.label_outline,
-      description:
-          'تصميم وطباعة استيكرات المنتجات والعبوات.',
-      unit: 'متر',
-      price: 40000,
-    ),
-    ServiceData(
-      name: 'أكياس بلاستيك',
-      icon: Icons.shopping_bag_outlined,
-      description:
-          'طباعة أكياس بلاستيك للمحلات والمشاريع.',
-      unit: 'كيلو',
-      price: 25000,
-    ),
-    ServiceData(
-      name: 'أكياس قماش',
-      icon: Icons.shopping_bag,
-      description:
-          'طباعة أكياس قماش مع الاسم والشعار.',
-      unit: 'كيلو',
-      price: 80000,
-    ),
-    ServiceData(
-      name: 'لوحات إعلانية',
-      icon: Icons.campaign_outlined,
-      description:
-          'تصميم وتنفيذ اللوحات الإعلانية.',
-      unit: 'متر',
-      price: 35000,
-    ),
-    ServiceData(
-      name: 'كروت الفال',
-      icon: Icons.card_giftcard_outlined,
-      description:
-          'طباعة كروت الفال للمناسبات.',
-      unit: 'حزمة 100 كرت',
-      price: 70000,
-      isCardPack: true,
-    ),
-  ];
 
   @override
   void initState() {
@@ -220,7 +216,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> loadOrders() async {
-    final List<Map<String, dynamic>> data =
+    final List<Map<String, dynamic>> result =
         await AppDatabase.getOrders();
 
     if (!mounted) {
@@ -228,37 +224,37 @@ class _HomePageState extends State<HomePage> {
     }
 
     setState(() {
-      orders = data;
+      orders = result;
       loading = false;
     });
   }
 
-  void openService(
-    ServiceData service,
-  ) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
+  void openService(ServiceData service) {
+    Navigator.of(context)
+        .push(
+      MaterialPageRoute<void>(
         builder: (BuildContext context) {
           return Directionality(
             textDirection: TextDirection.rtl,
-            child: ServicePage(
+            child: OrderFormPage(
               service: service,
-              onOrderSaved: loadOrders,
+              onSaved: loadOrders,
             ),
           );
         },
       ),
-    );
+    )
+        .then((_) {
+      loadOrders();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = <Widget>[
-      DashboardPage(
-        services: services,
+      HomeContent(
         orders: orders,
-        onServicePressed: openService,
+        onService: openService,
       ),
       OrdersPage(
         orders: orders,
@@ -272,17 +268,17 @@ class _HomePageState extends State<HomePage> {
             ? const Center(
                 child: CircularProgressIndicator(),
               )
-            : pages[selectedPage],
+            : pages[currentPage],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: selectedPage,
+        currentIndex: currentPage,
         selectedItemColor: GhanjatApp.purple,
-        onTap: (int value) {
+        onTap: (int index) {
           setState(() {
-            selectedPage = value;
+            currentPage = index;
           });
 
-          if (value == 1) {
+          if (index == 1) {
             loadOrders();
           }
         },
@@ -303,34 +299,36 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class DashboardPage extends StatelessWidget {
-  final List<ServiceData> services;
-  final List<Map<String, dynamic>> orders;
-  final ValueChanged<ServiceData> onServicePressed;
+// =====================================================
+// محتوى الرئيسية
+// =====================================================
 
-  const DashboardPage({
+class HomeContent extends StatelessWidget {
+  final List<Map<String, dynamic>> orders;
+  final ValueChanged<ServiceData> onService;
+
+  const HomeContent({
     Key? key,
-    required this.services,
     required this.orders,
-    required this.onServicePressed,
+    required this.onService,
   }) : super(key: key);
 
   String money(double value) {
     return value.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-      (Match match) => '${match[1]},',
+      (Match match) {
+        return '${match[1]},';
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    double remaining = 0;
+    double remainingTotal = 0;
 
-    for (final Map<String, dynamic> order
-        in orders) {
-      remaining +=
-          (order['remaining'] as num? ?? 0)
-              .toDouble();
+    for (final Map<String, dynamic> order in orders) {
+      remainingTotal +=
+          (order['remaining'] as num? ?? 0).toDouble();
     }
 
     return Scaffold(
@@ -338,27 +336,31 @@ class DashboardPage extends StatelessWidget {
         backgroundColor: GhanjatApp.purple,
         foregroundColor: Colors.white,
         centerTitle: true,
-        title: const Text('غنجات للطباعة'),
+        title: const Text(
+          'غنجات للطباعة',
+          style: TextStyle(fontSize: 23),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Container(
-              padding: const EdgeInsets.all(28),
+              padding: const EdgeInsets.symmetric(
+                vertical: 30,
+                horizontal: 20,
+              ),
               decoration: BoxDecoration(
                 color: GhanjatApp.turquoise,
-                borderRadius:
-                    BorderRadius.circular(32),
+                borderRadius: BorderRadius.circular(35),
               ),
               child: const Column(
                 children: <Widget>[
                   Icon(
                     Icons.print,
-                    size: 65,
                     color: Colors.white,
+                    size: 68,
                   ),
                   SizedBox(height: 10),
                   Text(
@@ -366,39 +368,37 @@ class DashboardPage extends StatelessWidget {
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 38,
-                      fontWeight:
-                          FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   Text(
                     'لخدمات الطباعة',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 21,
+                      fontSize: 22,
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
 
             Row(
               children: <Widget>[
                 Expanded(
                   child: summaryCard(
-                    'الطلبات',
-                    '${orders.length}',
-                    Icons.receipt_long_outlined,
+                    icon: Icons.receipt_long_outlined,
+                    title: 'الطلبات',
+                    value: '${orders.length}',
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: summaryCard(
-                    'المتبقي',
-                    '${money(remaining)} ج',
-                    Icons
-                        .account_balance_wallet_outlined,
+                    icon: Icons.account_balance_wallet_outlined,
+                    title: 'المتبقي',
+                    value: '${money(remainingTotal)} ج',
                   ),
                 ),
               ],
@@ -409,7 +409,7 @@ class DashboardPage extends StatelessWidget {
             const Text(
               'خدماتنا',
               style: TextStyle(
-                fontSize: 26,
+                fontSize: 27,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -418,30 +418,41 @@ class DashboardPage extends StatelessWidget {
 
             ...services.map(
               (ServiceData service) {
-                return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor:
-                          const Color(0xFFF2F8F7),
-                      child: Icon(
-                        service.icon,
-                        color:
-                            GhanjatApp.turquoise,
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Card(
+                    elevation: 1,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 7,
                       ),
-                    ),
-                    title: Text(
-                      service.name,
-                      style: const TextStyle(
-                        fontWeight:
-                            FontWeight.bold,
+                      leading: CircleAvatar(
+                        backgroundColor: GhanjatApp.light,
+                        child: Icon(
+                          service.icon,
+                          color: GhanjatApp.turquoise,
+                        ),
                       ),
+                      title: Text(
+                        service.name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Text(
+                        service.businessCard
+                            ? '100 كرت: اتجاه واحد 30,000 • اتجاهين 35,000'
+                            : '${money(service.price)} جنيه / ${service.unit}',
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_left,
+                      ),
+                      onTap: () {
+                        onService(service);
+                      },
                     ),
-                    trailing: const Icon(
-                      Icons.chevron_left,
-                    ),
-                    onTap: () {
-                      onServicePressed(service);
-                    },
                   ),
                 );
               },
@@ -453,8 +464,7 @@ class DashboardPage extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: GhanjatApp.purple,
-                borderRadius:
-                    BorderRadius.circular(25),
+                borderRadius: BorderRadius.circular(25),
               ),
               child: const Column(
                 children: <Widget>[
@@ -462,44 +472,33 @@ class DashboardPage extends StatelessWidget {
                     'تواصل معنا',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 22,
-                      fontWeight:
-                          FontWeight.bold,
+                      fontSize: 23,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SizedBox(height: 12),
-                  Text(
-                    '💬 0115494130',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '💬 0994482612',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                    ),
-                  ),
+                  SizedBox(height: 15),
+                  ContactNumber(number: '0115494130'),
+                  SizedBox(height: 10),
+                  ContactNumber(number: '0994482612'),
                 ],
               ),
             ),
+
+            const SizedBox(height: 25),
           ],
         ),
       ),
     );
   }
 
-  Widget summaryCard(
-    String title,
-    String value,
-    IconData icon,
-  ) {
+  Widget summaryCard({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(15),
+        padding: const EdgeInsets.all(14),
         child: Column(
           children: <Widget>[
             Icon(
@@ -507,13 +506,16 @@ class DashboardPage extends StatelessWidget {
               color: GhanjatApp.turquoise,
               size: 28,
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 6),
             Text(title),
+            const SizedBox(height: 3),
             Text(
               value,
+              textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 17,
+                color: GhanjatApp.purple,
                 fontWeight: FontWeight.bold,
+                fontSize: 17,
               ),
             ),
           ],
@@ -523,57 +525,102 @@ class DashboardPage extends StatelessWidget {
   }
 }
 
-class ServicePage extends StatefulWidget {
-  final ServiceData service;
-  final Future<void> Function() onOrderSaved;
+class ContactNumber extends StatelessWidget {
+  final String number;
 
-  const ServicePage({
+  const ContactNumber({
     Key? key,
-    required this.service,
-    required this.onOrderSaved,
+    required this.number,
   }) : super(key: key);
 
   @override
-  State<ServicePage> createState() {
-    return _ServicePageState();
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          const FaIcon(
+            FontAwesomeIcons.whatsapp,
+            color: Colors.greenAccent,
+            size: 25,
+          ),
+          const SizedBox(width: 10),
+          Text(
+            number,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 21,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-class _ServicePageState
-    extends State<ServicePage> {
+// =====================================================
+// فورم إنشاء الطلب
+// =====================================================
+
+class OrderFormPage extends StatefulWidget {
+  final ServiceData service;
+  final Future<void> Function() onSaved;
+
+  const OrderFormPage({
+    Key? key,
+    required this.service,
+    required this.onSaved,
+  }) : super(key: key);
+
+  @override
+  State<OrderFormPage> createState() {
+    return _OrderFormPageState();
+  }
+}
+
+class _OrderFormPageState extends State<OrderFormPage> {
   final GlobalKey<FormState> formKey =
       GlobalKey<FormState>();
 
-  final TextEditingController customer =
+  final TextEditingController customerController =
       TextEditingController();
 
-  final TextEditingController phone =
+  final TextEditingController phoneController =
       TextEditingController();
 
-  final TextEditingController quantity =
+  final TextEditingController quantityController =
       TextEditingController(text: '1');
 
-  final TextEditingController details =
+  final TextEditingController detailsController =
       TextEditingController();
 
-  final TextEditingController paid =
+  final TextEditingController paidController =
       TextEditingController(text: '0');
 
-  final TextEditingController notes =
+  final TextEditingController notesController =
       TextEditingController();
 
   String businessSide = 'اتجاه واحد';
 
-  double get quantityValue {
-    return double.tryParse(quantity.text) ?? 0;
+  bool saving = false;
+
+  double get quantity {
+    return double.tryParse(
+          quantityController.text,
+        ) ??
+        0;
   }
 
-  double get paidValue {
-    return double.tryParse(paid.text) ?? 0;
+  double get paid {
+    return double.tryParse(
+          paidController.text,
+        ) ??
+        0;
   }
 
   double get unitPrice {
-    if (widget.service.isBusinessCard) {
+    if (widget.service.businessCard) {
       if (businessSide == 'اتجاهين') {
         return 35000;
       }
@@ -585,62 +632,100 @@ class _ServicePageState
   }
 
   double get total {
-    return quantityValue * unitPrice;
+    return quantity * unitPrice;
   }
 
   double get remaining {
-    if (paidValue >= total) {
+    final double result = total - paid;
+
+    if (result < 0) {
       return 0;
     }
 
-    return total - paidValue;
+    return result;
   }
 
   String money(double value) {
     return value.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-      (Match match) => '${match[1]},',
+      (Match match) {
+        return '${match[1]},';
+      },
     );
   }
 
-  String quantityDescription() {
-    if (widget.service.isCardPack) {
-      final int cards =
-          (quantityValue * 100).round();
+  String get quantityText {
+    if (widget.service.pack100) {
+      final int cards = (quantity * 100).round();
 
       return '$cards كرت';
     }
 
-    return '${quantityValue.toString()} ${widget.service.unit}';
+    final String amount =
+        quantity % 1 == 0
+            ? quantity.toStringAsFixed(0)
+            : quantity.toStringAsFixed(2);
+
+    return '$amount ${widget.service.unit}';
   }
 
   Future<int?> saveOrder() async {
-    if (!(formKey.currentState?.validate() ??
-        false)) {
+    if (!(formKey.currentState?.validate() ?? false)) {
       return null;
     }
 
-    final int id =
-        await AppDatabase.addOrder(
+    if (quantity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'الكمية لازم تكون أكبر من صفر',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+
+      return null;
+    }
+
+    setState(() {
+      saving = true;
+    });
+
+    String details = detailsController.text.trim();
+
+    if (widget.service.businessCard) {
+      if (details.isEmpty) {
+        details = businessSide;
+      } else {
+        details = '$businessSide - $details';
+      }
+    }
+
+    final int id = await AppDatabase.insertOrder(
       <String, dynamic>{
-        'customer': customer.text.trim(),
-        'phone': phone.text.trim(),
+        'customer': customerController.text.trim(),
+        'phone': phoneController.text.trim(),
         'service': widget.service.name,
-        'quantity': quantityDescription(),
-        'details': widget.service.isBusinessCard
-            ? '$businessSide - ${details.text.trim()}'
-            : details.text.trim(),
+        'quantity': quantityText,
+        'details': details,
         'total': total,
-        'paid': paidValue,
+        'paid': paid,
         'remaining': remaining,
-        'notes': notes.text.trim(),
+        'notes': notesController.text.trim(),
         'status': 'جديد',
-        'created_at':
-            DateTime.now().toIso8601String(),
+        'created_at': DateTime.now().toIso8601String(),
       },
     );
 
-    await widget.onOrderSaved();
+    await widget.onSaved();
+
+    if (!mounted) {
+      return id;
+    }
+
+    setState(() {
+      saving = false;
+    });
 
     return id;
   }
@@ -662,24 +747,24 @@ class _ServicePageState
     );
   }
 
-  Future<void> saveAndWhatsApp() async {
+  Future<void> saveAndSend() async {
     final int? id = await saveOrder();
 
-    if (id == null) {
+    if (id == null || !mounted) {
       return;
     }
 
-    chooseWhatsApp(id);
+    showWhatsAppNumbers(id);
   }
 
-  void chooseWhatsApp(int orderId) {
-    showModalBottomSheet(
+  void showWhatsAppNumbers(int orderId) {
+    showModalBottomSheet<void>(
       context: context,
       builder: (BuildContext sheetContext) {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: Padding(
-            padding: const EdgeInsets.all(25),
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
@@ -688,22 +773,22 @@ class _ServicePageState
                   color: Colors.green,
                   size: 45,
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 12),
                 Text(
-                  'إرسال الطلب #$orderId إلى',
+                  'إرسال الطلب #$orderId عبر واتساب',
                   style: const TextStyle(
                     fontSize: 21,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 18),
-                whatsappButton(
+                whatsappChoice(
                   sheetContext,
                   orderId,
                   '0115494130',
                 ),
                 const SizedBox(height: 10),
-                whatsappButton(
+                whatsappChoice(
                   sheetContext,
                   orderId,
                   '0994482612',
@@ -716,7 +801,7 @@ class _ServicePageState
     );
   }
 
-  Widget whatsappButton(
+  Widget whatsappChoice(
     BuildContext sheetContext,
     int orderId,
     String number,
@@ -725,7 +810,7 @@ class _ServicePageState
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () {
-          Navigator.pop(sheetContext);
+          Navigator.of(sheetContext).pop();
 
           openWhatsApp(
             orderId,
@@ -735,16 +820,14 @@ class _ServicePageState
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
-          padding:
-              const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(14),
         ),
         icon: const FaIcon(
           FontAwesomeIcons.whatsapp,
         ),
         label: Text(
           number,
-          style:
-              const TextStyle(fontSize: 19),
+          style: const TextStyle(fontSize: 20),
         ),
       ),
     );
@@ -759,20 +842,36 @@ class _ServicePageState
             ? '249115494130'
             : '249994482612';
 
+    final String details =
+        detailsController.text.trim().isEmpty
+            ? 'لا توجد'
+            : detailsController.text.trim();
+
+    final String notes =
+        notesController.text.trim().isEmpty
+            ? 'لا توجد'
+            : notesController.text.trim();
+
+    String printType = '';
+
+    if (widget.service.businessCard) {
+      printType = 'نوع الطباعة: $businessSide\n';
+    }
+
     final String message =
         'طلب جديد - غنجات للطباعة\n\n'
         'رقم الطلب: #$orderId\n'
         'الخدمة: ${widget.service.name}\n'
-        'العميل: ${customer.text.trim()}\n'
-        'الهاتف: ${phone.text.trim()}\n'
-        'الكمية: ${quantityDescription()}\n'
-        '${widget.service.isBusinessCard ? 'نوع الطباعة: $businessSide\n' : ''}'
-        'التفاصيل: ${details.text.trim()}\n'
+        '$printType'
+        'العميل: ${customerController.text.trim()}\n'
+        'الهاتف: ${phoneController.text.trim()}\n'
+        'الكمية: $quantityText\n'
+        'التفاصيل: $details\n'
         'الإجمالي: ${money(total)} جنيه\n'
-        'المدفوع: ${money(paidValue)} جنيه\n'
+        'المدفوع: ${money(paid)} جنيه\n'
         'المتبقي: ${money(remaining)} جنيه\n'
         'الحالة: جديد\n'
-        'الملاحظات: ${notes.text.trim()}';
+        'الملاحظات: $notes';
 
     final Uri uri = Uri.parse(
       'https://wa.me/$international?text=${Uri.encodeComponent(message)}',
@@ -784,22 +883,21 @@ class _ServicePageState
     );
   }
 
-  Widget field(
-    TextEditingController controller,
-    String label,
-    IconData icon, {
-    TextInputType? keyboard,
+  Widget textField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
     bool requiredField = false,
     ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
       controller: controller,
-      keyboardType: keyboard,
+      keyboardType: keyboardType,
       onChanged: onChanged,
       validator: requiredField
           ? (String? value) {
-              if (value == null ||
-                  value.trim().isEmpty) {
+              if (value == null || value.trim().isEmpty) {
                 return 'أدخل $label';
               }
 
@@ -813,11 +911,54 @@ class _ServicePageState
           color: GhanjatApp.turquoise,
         ),
         border: OutlineInputBorder(
-          borderRadius:
-              BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(15),
         ),
       ),
     );
+  }
+
+  Widget amountRow(
+    String title,
+    String value, {
+    bool bold = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: <Widget>[
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight:
+                  bold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: bold ? 19 : 17,
+              fontWeight: FontWeight.bold,
+              color:
+                  bold ? GhanjatApp.purple : Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    customerController.dispose();
+    phoneController.dispose();
+    quantityController.dispose();
+    detailsController.dispose();
+    paidController.dispose();
+    notesController.dispose();
+
+    super.dispose();
   }
 
   @override
@@ -826,55 +967,598 @@ class _ServicePageState
       appBar: AppBar(
         backgroundColor: GhanjatApp.purple,
         foregroundColor: Colors.white,
-        title: Text(widget.service.name),
         centerTitle: true,
+        title: Text(widget.service.name),
       ),
       body: Form(
         key: formKey,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Icon(
-                widget.service.icon,
-                size: 70,
-                color: GhanjatApp.turquoise,
+              Center(
+                child: Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    color: GhanjatApp.light,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Icon(
+                    widget.service.icon,
+                    color: GhanjatApp.turquoise,
+                    size: 58,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              Text(
+                widget.service.name,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 27,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 15),
+
+              if (widget.service.businessCard)
+                Container(
+                  decoration: BoxDecoration(
+                    color: GhanjatApp.light,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    children: <Widget>[
+                      RadioListTile<String>(
+                        value: 'اتجاه واحد',
+                        groupValue: businessSide,
+                        title: const Text(
+                          'اتجاه واحد - 30,000 جنيه / 100 كرت',
+                        ),
+                        onChanged: (String? value) {
+                          if (value == null) {
+                            return;
+                          }
+
+                          setState(() {
+                            businessSide = value;
+                          });
+                        },
+                      ),
+                      RadioListTile<String>(
+                        value: 'اتجاهين',
+                        groupValue: businessSide,
+                        title: const Text(
+                          'اتجاهين - 35,000 جنيه / 100 كرت',
+                        ),
+                        onChanged: (String? value) {
+                          if (value == null) {
+                            return;
+                          }
+
+                          setState(() {
+                            businessSide = value;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: GhanjatApp.light,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Text(
+                    'السعر: ${money(unitPrice)} جنيه / ${widget.service.unit}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: GhanjatApp.purple,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: 22),
+
+              const Text(
+                'بيانات الطلب',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 15),
+
+              textField(
+                controller: customerController,
+                label: 'اسم العميل',
+                icon: Icons.person_outline,
+                requiredField: true,
+              ),
+
+              const SizedBox(height: 12),
+
+              textField(
+                controller: phoneController,
+                label: 'رقم الهاتف',
+                icon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+                requiredField: true,
+              ),
+
+              const SizedBox(height: 12),
+
+              textField(
+                controller: quantityController,
+                label: widget.service.pack100
+                    ? 'عدد الحزم - كل حزمة 100 كرت'
+                    : 'الكمية بـ ${widget.service.unit}',
+                icon: Icons.numbers,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                requiredField: true,
+                onChanged: (String value) {
+                  setState(() {});
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              textField(
+                controller: detailsController,
+                label: 'المقاس / التفاصيل',
+                icon: Icons.straighten,
+              ),
+
+              const SizedBox(height: 12),
+
+              textField(
+                controller: paidController,
+                label: 'المبلغ المدفوع',
+                icon: Icons.payments_outlined,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                onChanged: (String value) {
+                  setState(() {});
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: notesController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'ملاحظات',
+                  prefixIcon: const Icon(
+                    Icons.notes,
+                    color: GhanjatApp.turquoise,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
               ),
 
               const SizedBox(height: 20),
 
-              if (widget.service.isBusinessCard)
-                Column(
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: GhanjatApp.light,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
                   children: <Widget>[
-                    RadioListTile<String>(
-                      title: const Text(
-                        'اتجاه واحد - 30,000 / 100',
-                      ),
-                      value: 'اتجاه واحد',
-                      groupValue: businessSide,
-                      onChanged: (String? value) {
-                        if (value != null) {
-                          setState(() {
-                            businessSide = value;
-                          });
-                        }
-                      },
+                    amountRow(
+                      'الإجمالي',
+                      '${money(total)} جنيه',
+                      bold: true,
                     ),
-                    RadioListTile<String>(
-                      title: const Text(
-                        'اتجاهين - 35,000 / 100',
-                      ),
-                      value: 'اتجاهين',
-                      groupValue: businessSide,
-                      onChanged: (String? value) {
-                        if (value != null) {
-                          setState(() {
-                            businessSide = value;
-                          });
-                        }
-                      },
+                    const Divider(),
+                    amountRow(
+                      'المدفوع',
+                      '${money(paid)} جنيه',
+                    ),
+                    const Divider(),
+                    amountRow(
+                      'المتبقي',
+                      '${money(remaining)} جنيه',
+                      bold: true,
                     ),
                   ],
                 ),
+              ),
 
-              const SizedBox(height: 10
+              const SizedBox(height: 20),
+
+              SizedBox(
+                height: 58,
+                child: ElevatedButton.icon(
+                  onPressed: saving ? null : saveOnly,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: GhanjatApp.purple,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text(
+                    'حفظ الطلب',
+                    style: TextStyle(fontSize: 19),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              SizedBox(
+                height: 58,
+                child: ElevatedButton.icon(
+                  onPressed: saving ? null : saveAndSend,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const FaIcon(
+                    FontAwesomeIcons.whatsapp,
+                  ),
+                  label: const Text(
+                    'حفظ وإرسال عبر واتساب',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 25),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =====================================================
+// صفحة الطلبات
+// =====================================================
+
+class OrdersPage extends StatelessWidget {
+  final List<Map<String, dynamic>> orders;
+  final Future<void> Function() onRefresh;
+
+  const OrdersPage({
+    Key? key,
+    required this.orders,
+    required this.onRefresh,
+  }) : super(key: key);
+
+  String money(double value) {
+    return value.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (Match match) {
+        return '${match[1]},';
+      },
+    );
+  }
+
+  Color statusColor(String status) {
+    if (status == 'تم التسليم') {
+      return Colors.green;
+    }
+
+    if (status == 'جاهز') {
+      return Colors.blue;
+    }
+
+    if (status == 'تحت التنفيذ') {
+      return Colors.orange;
+    }
+
+    return Colors.grey;
+  }
+
+  Future<void> changeStatus(
+    BuildContext context,
+    Map<String, dynamic> order,
+  ) async {
+    final String? newStatus =
+        await showModalBottomSheet<String>(
+      context: context,
+      builder: (BuildContext sheetContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const SizedBox(height: 12),
+              const Text(
+                'تغيير حالة الطلب',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              statusItem(
+                sheetContext,
+                'جديد',
+              ),
+              statusItem(
+                sheetContext,
+                'تحت التنفيذ',
+              ),
+              statusItem(
+                sheetContext,
+                'جاهز',
+              ),
+              statusItem(
+                sheetContext,
+                'تم التسليم',
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (newStatus == null) {
+      return;
+    }
+
+    await AppDatabase.changeStatus(
+      order['id'] as int,
+      newStatus,
+    );
+
+    await onRefresh();
+  }
+
+  Widget statusItem(
+    BuildContext context,
+    String status,
+  ) {
+    return ListTile(
+      leading: Icon(
+        Icons.circle,
+        color: statusColor(status),
+        size: 15,
+      ),
+      title: Text(status),
+      onTap: () {
+        Navigator.of(context).pop(status);
+      },
+    );
+  }
+
+  Future<void> removeOrder(
+    BuildContext context,
+    Map<String, dynamic> order,
+  ) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('حذف الطلب'),
+            content: Text(
+              'متأكد من حذف الطلب رقم #${order['id']}؟',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(false);
+                },
+                child: const Text('إلغاء'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(true);
+                },
+                child: const Text(
+                  'حذف',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirm != true) {
+      return;
+    }
+
+    await AppDatabase.deleteOrder(
+      order['id'] as int,
+    );
+
+    await onRefresh();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: GhanjatApp.purple,
+        foregroundColor: Colors.white,
+        centerTitle: true,
+        title: Text(
+          'الطلبات (${orders.length})',
+        ),
+      ),
+      body: orders.isEmpty
+          ? const Center(
+              child: Text(
+                'ما في طلبات محفوظة لسه',
+                style: TextStyle(fontSize: 18),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: onRefresh,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: orders.length,
+                itemBuilder: (
+                  BuildContext context,
+                  int index,
+                ) {
+                  final Map<String, dynamic> order =
+                      orders[index];
+
+                  final double total =
+                      (order['total'] as num? ?? 0)
+                          .toDouble();
+
+                  final double paid =
+                      (order['paid'] as num? ?? 0)
+                          .toDouble();
+
+                  final double remaining =
+                      (order['remaining'] as num? ?? 0)
+                          .toDouble();
+
+                  final String status =
+                      order['status']?.toString() ??
+                          'جديد';
+
+                  return Card(
+                    margin: const EdgeInsets.only(
+                      bottom: 12,
+                    ),
+                    child: ExpansionTile(
+                      leading: CircleAvatar(
+                        backgroundColor:
+                            GhanjatApp.turquoise,
+                        foregroundColor:
+                            Colors.white,
+                        child: Text(
+                          '${order['id']}',
+                        ),
+                      ),
+                      title: Text(
+                        order['customer']
+                                ?.toString() ??
+                            '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${order['service']} • باقي ${money(remaining)} ج',
+                      ),
+                      children: <Widget>[
+                        ListTile(
+                          leading: const Icon(
+                            Icons.phone_outlined,
+                          ),
+                          title: Text(
+                            order['phone']
+                                    ?.toString() ??
+                                '',
+                          ),
+                        ),
+                        ListTile(
+                          leading: const Icon(
+                            Icons.numbers,
+                          ),
+                          title: Text(
+                            'الكمية: ${order['quantity']}',
+                          ),
+                        ),
+                        if ((order['details']
+                                    ?.toString() ??
+                                '')
+                            .isNotEmpty)
+                          ListTile(
+                            leading: const Icon(
+                              Icons.info_outline,
+                            ),
+                            title: Text(
+                              order['details']
+                                  .toString(),
+                            ),
+                          ),
+                        ListTile(
+                          leading: const Icon(
+                            Icons.payments_outlined,
+                          ),
+                          title: Text(
+                            'الإجمالي: ${money(total)} جنيه',
+                          ),
+                          subtitle: Text(
+                            'المدفوع: ${money(paid)} • المتبقي: ${money(remaining)}',
+                          ),
+                        ),
+                        ListTile(
+                          leading: Icon(
+                            Icons.circle,
+                            color: statusColor(status),
+                            size: 15,
+                          ),
+                          title: Text(
+                            'الحالة: $status',
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            12,
+                            0,
+                            12,
+                            12,
+                          ),
+                          child: Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    changeStatus(
+                                      context,
+                                      order,
+                                    );
+                                  },
+                                  icon: const Icon(
+                                    Icons.sync,
+                                  ),
+                                  label: const Text(
+                                    'تغيير الحالة',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                onPressed: () {
+                                  removeOrder(
+                                    context,
+                                    order,
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+    );
+  }
+}
