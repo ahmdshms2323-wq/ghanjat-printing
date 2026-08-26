@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 void main() {
   runApp(const GhanjatApp());
@@ -57,12 +59,7 @@ class HomePage extends StatelessWidget {
         height: 72,
         child: ElevatedButton(
           onPressed: () {
-            openService(
-              context,
-              title,
-              icon,
-              description,
-            );
+            openService(context, title, icon, description);
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFF2F8F7),
@@ -84,9 +81,7 @@ class HomePage extends StatelessWidget {
                 child: Text(
                   title,
                   textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontSize: 20,
-                  ),
+                  style: const TextStyle(fontSize: 20),
                 ),
               ),
               const Icon(
@@ -107,10 +102,10 @@ class HomePage extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
-          const Icon(
-            Icons.chat,
+          const FaIcon(
+            FontAwesomeIcons.whatsapp,
             color: Colors.greenAccent,
-            size: 28,
+            size: 27,
           ),
           const SizedBox(width: 10),
           Text(
@@ -147,8 +142,6 @@ class HomePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-
-                // شعار غنجات
                 Container(
                   padding: const EdgeInsets.symmetric(
                     vertical: 35,
@@ -235,7 +228,6 @@ class HomePage extends StatelessWidget {
 
                 const SizedBox(height: 15),
 
-                // التواصل
                 Container(
                   padding: const EdgeInsets.symmetric(
                     vertical: 25,
@@ -277,11 +269,6 @@ class HomePage extends StatelessWidget {
   }
 }
 
-
-// =====================================
-// صفحة الخدمة
-// =====================================
-
 class ServicePage extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -297,7 +284,43 @@ class ServicePage extends StatelessWidget {
   static const Color purple = Color(0xFF432B70);
   static const Color turquoise = Color(0xFF74B5AE);
 
-  void showWhatsAppNumbers(BuildContext context) {
+  Future<void> openWhatsApp(
+    BuildContext context,
+    String localNumber,
+  ) async {
+    String internationalNumber;
+
+    if (localNumber == '0115494130') {
+      internationalNumber = '249115494130';
+    } else {
+      internationalNumber = '249994482612';
+    }
+
+    final String message =
+        'السلام عليكم، أريد طلب خدمة $title من غنجات للطباعة.';
+
+    final Uri whatsappUri = Uri.parse(
+      'https://wa.me/$internationalNumber?text=${Uri.encodeComponent(message)}',
+    );
+
+    final bool opened = await launchUrl(
+      whatsappUri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تعذر فتح واتساب',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+  }
+
+  void chooseWhatsAppNumber(BuildContext context) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -305,7 +328,7 @@ class ServicePage extends StatelessWidget {
           top: Radius.circular(25),
         ),
       ),
-      builder: (context) {
+      builder: (BuildContext sheetContext) {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: Padding(
@@ -313,24 +336,31 @@ class ServicePage extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
+                const FaIcon(
+                  FontAwesomeIcons.whatsapp,
+                  color: Colors.green,
+                  size: 45,
+                ),
+                const SizedBox(height: 12),
                 const Text(
-                  'اختر رقم التواصل',
+                  'اختر رقم الواتساب',
                   style: TextStyle(
                     fontSize: 23,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 20),
 
-                contactNumber(
+                whatsappButton(
+                  sheetContext,
                   context,
                   '0115494130',
                 ),
 
                 const SizedBox(height: 12),
 
-                contactNumber(
+                whatsappButton(
+                  sheetContext,
                   context,
                   '0994482612',
                 ),
@@ -344,8 +374,9 @@ class ServicePage extends StatelessWidget {
     );
   }
 
-  Widget contactNumber(
-    BuildContext context,
+  Widget whatsappButton(
+    BuildContext sheetContext,
+    BuildContext pageContext,
     String number,
   ) {
     return SizedBox(
@@ -353,18 +384,13 @@ class ServicePage extends StatelessWidget {
       height: 60,
       child: ElevatedButton.icon(
         onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'رقم واتساب: $number',
-                textAlign: TextAlign.center,
-              ),
-            ),
-          );
+          Navigator.of(sheetContext).pop();
+          openWhatsApp(pageContext, number);
         },
-        icon: const Icon(
-          Icons.chat,
+        icon: const FaIcon(
+          FontAwesomeIcons.whatsapp,
           color: Colors.white,
+          size: 25,
         ),
         label: Text(
           number,
@@ -389,24 +415,20 @@ class ServicePage extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Colors.white,
-
         appBar: AppBar(
           backgroundColor: purple,
           foregroundColor: Colors.white,
           centerTitle: true,
           title: Text(title),
         ),
-
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(22),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-
                 const SizedBox(height: 15),
 
-                // رمز الخدمة
                 Center(
                   child: Container(
                     width: 130,
@@ -454,7 +476,6 @@ class ServicePage extends StatelessWidget {
 
                 const SizedBox(height: 25),
 
-                // مكان النماذج
                 Container(
                   height: 180,
                   decoration: BoxDecoration(
@@ -490,7 +511,7 @@ class ServicePage extends StatelessWidget {
                   height: 65,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      showWhatsAppNumbers(context);
+                      chooseWhatsAppNumber(context);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
@@ -499,8 +520,8 @@ class ServicePage extends StatelessWidget {
                         borderRadius: BorderRadius.circular(18),
                       ),
                     ),
-                    icon: const Icon(
-                      Icons.chat,
+                    icon: const FaIcon(
+                      FontAwesomeIcons.whatsapp,
                       size: 28,
                     ),
                     label: const Text(
