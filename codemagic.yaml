@@ -33,6 +33,9 @@ workflows:
 
           flutter pub add url_launcher
           flutter pub add font_awesome_flutter
+          flutter pub add sqflite
+          flutter pub add path
+
           flutter pub get
 
       - name: Build Android APK
