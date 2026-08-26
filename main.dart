@@ -1,8 +1,12 @@
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const GhanjatApp());
 }
 
@@ -21,7 +25,98 @@ class GhanjatApp extends StatelessWidget {
         primarySwatch: Colors.deepPurple,
         scaffoldBackgroundColor: Colors.white,
       ),
-      home: const HomePage(),
+      home: const Directionality(
+        textDirection: TextDirection.rtl,
+        child: HomePage(),
+      ),
+    );
+  }
+}
+
+class AppDatabase {
+  static Database? _database;
+
+  static Future<Database> get database async {
+    if (_database != null) {
+      return _database!;
+    }
+
+    final String dbPath = join(
+      await getDatabasesPath(),
+      'ghanjat_orders.db',
+    );
+
+    _database = await openDatabase(
+      dbPath,
+      version: 1,
+      onCreate: (Database db, int version) async {
+        await db.execute('''
+          CREATE TABLE orders(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            service TEXT NOT NULL,
+            quantity TEXT NOT NULL,
+            details TEXT,
+            total REAL NOT NULL,
+            paid REAL NOT NULL,
+            remaining REAL NOT NULL,
+            notes TEXT,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL
+          )
+        ''');
+      },
+    );
+
+    return _database!;
+  }
+
+  static Future<int> addOrder(
+    Map<String, dynamic> order,
+  ) async {
+    final Database db = await database;
+
+    return db.insert(
+      'orders',
+      order,
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> getOrders() async {
+    final Database db = await database;
+
+    return db.query(
+      'orders',
+      orderBy: 'id DESC',
+    );
+  }
+
+  static Future<void> updateStatus(
+    int id,
+    String status,
+  ) async {
+    final Database db = await database;
+
+    await db.update(
+      'orders',
+      <String, dynamic>{
+        'status': status,
+      },
+      where: 'id = ?',
+      whereArgs: <Object>[id],
+    );
+  }
+
+  static Future<void> deleteOrder(
+    int id,
+  ) async {
+    final Database db = await database;
+
+    await db.delete(
+      'orders',
+      where: 'id = ?',
+      whereArgs: <Object>[id],
     );
   }
 }
@@ -46,15 +141,30 @@ class ServiceData {
   });
 }
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
-  static const List<ServiceData> services = <ServiceData>[
+  @override
+  State<HomePage> createState() {
+    return _HomePageState();
+  }
+}
+
+class _HomePageState extends State<HomePage> {
+  int selectedPage = 0;
+
+  List<Map<String, dynamic>> orders =
+      <Map<String, dynamic>>[];
+
+  bool loading = true;
+
+  static const List<ServiceData> services =
+      <ServiceData>[
     ServiceData(
       name: 'بزنس كارد',
       icon: Icons.badge_outlined,
       description:
-          'طباعة بزنس كارد احترافي. كل حزمة تحتوي على 100 كرت.',
+          'تصميم وطباعة بزنس كارد احترافي.',
       unit: 'حزمة 100 كرت',
       price: 30000,
       isBusinessCard: true,
@@ -64,7 +174,7 @@ class HomePage extends StatelessWidget {
       name: 'استيكرات منتجات',
       icon: Icons.label_outline,
       description:
-          'طباعة استيكرات للمنتجات والعبوات والمشاريع التجارية.',
+          'تصميم وطباعة استيكرات المنتجات والعبوات.',
       unit: 'متر',
       price: 40000,
     ),
@@ -72,7 +182,7 @@ class HomePage extends StatelessWidget {
       name: 'أكياس بلاستيك',
       icon: Icons.shopping_bag_outlined,
       description:
-          'طباعة أكياس بلاستيك للمحلات والمشاريع التجارية.',
+          'طباعة أكياس بلاستيك للمحلات والمشاريع.',
       unit: 'كيلو',
       price: 25000,
     ),
@@ -80,7 +190,7 @@ class HomePage extends StatelessWidget {
       name: 'أكياس قماش',
       icon: Icons.shopping_bag,
       description:
-          'طباعة أكياس قماش للمحلات والمشاريع مع إمكانية إضافة الشعار.',
+          'طباعة أكياس قماش مع الاسم والشعار.',
       unit: 'كيلو',
       price: 80000,
     ),
@@ -88,7 +198,7 @@ class HomePage extends StatelessWidget {
       name: 'لوحات إعلانية',
       icon: Icons.campaign_outlined,
       description:
-          'تصميم وتنفيذ اللوحات الإعلانية للمحلات والشركات والمناسبات.',
+          'تصميم وتنفيذ اللوحات الإعلانية.',
       unit: 'متر',
       price: 35000,
     ),
@@ -96,15 +206,34 @@ class HomePage extends StatelessWidget {
       name: 'كروت الفال',
       icon: Icons.card_giftcard_outlined,
       description:
-          'طباعة كروت الفال للمناسبات. كل حزمة تحتوي على 100 كرت.',
+          'طباعة كروت الفال للمناسبات.',
       unit: 'حزمة 100 كرت',
       price: 70000,
       isCardPack: true,
     ),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    loadOrders();
+  }
+
+  Future<void> loadOrders() async {
+    final List<Map<String, dynamic>> data =
+        await AppDatabase.getOrders();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      orders = data;
+      loading = false;
+    });
+  }
+
   void openService(
-    BuildContext context,
     ServiceData service,
   ) {
     Navigator.push(
@@ -113,209 +242,281 @@ class HomePage extends StatelessWidget {
         builder: (BuildContext context) {
           return Directionality(
             textDirection: TextDirection.rtl,
-            child: ServicePage(service: service),
+            child: ServicePage(
+              service: service,
+              onOrderSaved: loadOrders,
+            ),
           );
         },
       ),
     );
   }
 
-  Widget serviceButton(
-    BuildContext context,
-    ServiceData service,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: SizedBox(
-        width: double.infinity,
-        height: 75,
-        child: ElevatedButton(
-          onPressed: () {
-            openService(context, service);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFF2F8F7),
-            foregroundColor: Colors.black87,
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> pages = <Widget>[
+      DashboardPage(
+        services: services,
+        orders: orders,
+        onServicePressed: openService,
+      ),
+      OrdersPage(
+        orders: orders,
+        onRefresh: loadOrders,
+      ),
+    ];
+
+    return Scaffold(
+      body: SafeArea(
+        child: loading
+            ? const Center(
+                child: CircularProgressIndicator(),
+              )
+            : pages[selectedPage],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: selectedPage,
+        selectedItemColor: GhanjatApp.purple,
+        onTap: (int value) {
+          setState(() {
+            selectedPage = value;
+          });
+
+          if (value == 1) {
+            loadOrders();
+          }
+        },
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'الرئيسية',
           ),
-          child: Row(
-            children: <Widget>[
-              Icon(
-                service.icon,
-                size: 30,
-                color: GhanjatApp.turquoise,
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      service.name,
-                      style: const TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      service.isBusinessCard
-                          ? '100 كرت من 30,000 جنيه'
-                          : '${money(service.price)} جنيه / ${service.unit}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.arrow_back_ios_new,
-                size: 18,
-                color: Colors.grey,
-              ),
-            ],
+          BottomNavigationBarItem(
+            icon: Icon(Icons.receipt_long_outlined),
+            activeIcon: Icon(Icons.receipt_long),
+            label: 'الطلبات',
           ),
-        ),
+        ],
       ),
     );
   }
+}
 
-  static String money(double value) {
+class DashboardPage extends StatelessWidget {
+  final List<ServiceData> services;
+  final List<Map<String, dynamic>> orders;
+  final ValueChanged<ServiceData> onServicePressed;
+
+  const DashboardPage({
+    Key? key,
+    required this.services,
+    required this.orders,
+    required this.onServicePressed,
+  }) : super(key: key);
+
+  String money(double value) {
     return value.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
       (Match match) => '${match[1]},',
     );
   }
 
-  Widget contactNumber(String number) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          const FaIcon(
-            FontAwesomeIcons.whatsapp,
-            color: Colors.greenAccent,
-            size: 26,
-          ),
-          const SizedBox(width: 10),
-          Text(
-            number,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 23,
-              fontWeight: FontWeight.w500,
+  @override
+  Widget build(BuildContext context) {
+    double remaining = 0;
+
+    for (final Map<String, dynamic> order
+        in orders) {
+      remaining +=
+          (order['remaining'] as num? ?? 0)
+              .toDouble();
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: GhanjatApp.purple,
+        foregroundColor: Colors.white,
+        centerTitle: true,
+        title: const Text('غنجات للطباعة'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: GhanjatApp.turquoise,
+                borderRadius:
+                    BorderRadius.circular(32),
+              ),
+              child: const Column(
+                children: <Widget>[
+                  Icon(
+                    Icons.print,
+                    size: 65,
+                    color: Colors.white,
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    'غنجات',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 38,
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'لخدمات الطباعة',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+
+            const SizedBox(height: 20),
+
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: summaryCard(
+                    'الطلبات',
+                    '${orders.length}',
+                    Icons.receipt_long_outlined,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: summaryCard(
+                    'المتبقي',
+                    '${money(remaining)} ج',
+                    Icons
+                        .account_balance_wallet_outlined,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 25),
+
+            const Text(
+              'خدماتنا',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            ...services.map(
+              (ServiceData service) {
+                return Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor:
+                          const Color(0xFFF2F8F7),
+                      child: Icon(
+                        service.icon,
+                        color:
+                            GhanjatApp.turquoise,
+                      ),
+                    ),
+                    title: Text(
+                      service.name,
+                      style: const TextStyle(
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+                    trailing: const Icon(
+                      Icons.chevron_left,
+                    ),
+                    onTap: () {
+                      onServicePressed(service);
+                    },
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 18),
+
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: GhanjatApp.purple,
+                borderRadius:
+                    BorderRadius.circular(25),
+              ),
+              child: const Column(
+                children: <Widget>[
+                  Text(
+                    'تواصل معنا',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    '💬 0115494130',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '💬 0994482612',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: GhanjatApp.purple,
-          foregroundColor: Colors.white,
-          centerTitle: true,
-          title: const Text(
-            'غنجات للطباعة',
-            style: TextStyle(fontSize: 23),
-          ),
-        ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 32,
-                    horizontal: 20,
-                  ),
-                  decoration: BoxDecoration(
-                    color: GhanjatApp.turquoise,
-                    borderRadius: BorderRadius.circular(35),
-                  ),
-                  child: const Column(
-                    children: <Widget>[
-                      Icon(
-                        Icons.print,
-                        color: Colors.white,
-                        size: 68,
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        'غنجات',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 38,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'لخدمات الطباعة',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 28),
-                const Text(
-                  'خدماتنا',
-                  style: TextStyle(
-                    fontSize: 27,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ...services.map(
-                  (ServiceData service) =>
-                      serviceButton(context, service),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 24,
-                    horizontal: 15,
-                  ),
-                  decoration: BoxDecoration(
-                    color: GhanjatApp.purple,
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Column(
-                    children: <Widget>[
-                      const Text(
-                        'تواصل معنا',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 25,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 17),
-                      contactNumber('0115494130'),
-                      const SizedBox(height: 12),
-                      contactNumber('0994482612'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 25),
-              ],
+  Widget summaryCard(
+    String title,
+    String value,
+    IconData icon,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          children: <Widget>[
+            Icon(
+              icon,
+              color: GhanjatApp.turquoise,
+              size: 28,
             ),
-          ),
+            const SizedBox(height: 7),
+            Text(title),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -324,45 +525,51 @@ class HomePage extends StatelessWidget {
 
 class ServicePage extends StatefulWidget {
   final ServiceData service;
+  final Future<void> Function() onOrderSaved;
 
   const ServicePage({
     Key? key,
     required this.service,
+    required this.onOrderSaved,
   }) : super(key: key);
 
   @override
-  State<ServicePage> createState() => _ServicePageState();
+  State<ServicePage> createState() {
+    return _ServicePageState();
+  }
 }
 
-class _ServicePageState extends State<ServicePage> {
-  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+class _ServicePageState
+    extends State<ServicePage> {
+  final GlobalKey<FormState> formKey =
+      GlobalKey<FormState>();
 
-  final TextEditingController customerController =
+  final TextEditingController customer =
       TextEditingController();
 
-  final TextEditingController phoneController =
+  final TextEditingController phone =
       TextEditingController();
 
-  final TextEditingController quantityController =
+  final TextEditingController quantity =
       TextEditingController(text: '1');
 
-  final TextEditingController sizeController =
+  final TextEditingController details =
       TextEditingController();
 
-  final TextEditingController paidController =
+  final TextEditingController paid =
       TextEditingController(text: '0');
 
-  final TextEditingController notesController =
+  final TextEditingController notes =
       TextEditingController();
 
   String businessSide = 'اتجاه واحد';
 
-  double get quantity {
-    return double.tryParse(quantityController.text) ?? 0;
+  double get quantityValue {
+    return double.tryParse(quantity.text) ?? 0;
   }
 
-  double get paid {
-    return double.tryParse(paidController.text) ?? 0;
+  double get paidValue {
+    return double.tryParse(paid.text) ?? 0;
   }
 
   double get unitPrice {
@@ -370,6 +577,7 @@ class _ServicePageState extends State<ServicePage> {
       if (businessSide == 'اتجاهين') {
         return 35000;
       }
+
       return 30000;
     }
 
@@ -377,19 +585,15 @@ class _ServicePageState extends State<ServicePage> {
   }
 
   double get total {
-    if (quantity <= 0) {
-      return 0;
-    }
-
-    return quantity * unitPrice;
+    return quantityValue * unitPrice;
   }
 
   double get remaining {
-    if (paid >= total) {
+    if (paidValue >= total) {
       return 0;
     }
 
-    return total - paid;
+    return total - paidValue;
   }
 
   String money(double value) {
@@ -399,104 +603,78 @@ class _ServicePageState extends State<ServicePage> {
     );
   }
 
-  String quantityText() {
+  String quantityDescription() {
     if (widget.service.isCardPack) {
-      final int cards = (quantity * 100).round();
+      final int cards =
+          (quantityValue * 100).round();
 
-      return '${quantity.toStringAsFixed(quantity % 1 == 0 ? 0 : 1)} حزمة = $cards كرت';
+      return '$cards كرت';
     }
 
-    return '${quantity.toStringAsFixed(quantity % 1 == 0 ? 0 : 2)} ${widget.service.unit}';
+    return '${quantityValue.toString()} ${widget.service.unit}';
   }
 
-  Future<void> openWhatsApp(
-    BuildContext context,
-    String localNumber,
-  ) async {
-    String internationalNumber;
-
-    if (localNumber == '0115494130') {
-      internationalNumber = '249115494130';
-    } else {
-      internationalNumber = '249994482612';
+  Future<int?> saveOrder() async {
+    if (!(formKey.currentState?.validate() ??
+        false)) {
+      return null;
     }
 
-    String extra = '';
-
-    if (widget.service.isBusinessCard) {
-      extra = '\nنوع الطباعة: $businessSide';
-    }
-
-    final String size = sizeController.text.trim().isEmpty
-        ? 'غير محدد'
-        : sizeController.text.trim();
-
-    final String notes = notesController.text.trim().isEmpty
-        ? 'لا توجد'
-        : notesController.text.trim();
-
-    final String message =
-        'طلب جديد - غنجات للطباعة\n\n'
-        'الخدمة: ${widget.service.name}'
-        '$extra\n'
-        'اسم العميل: ${customerController.text.trim()}\n'
-        'رقم العميل: ${phoneController.text.trim()}\n'
-        'الكمية: ${quantityText()}\n'
-        'المقاس / التفاصيل: $size\n'
-        'سعر الوحدة: ${money(unitPrice)} جنيه\n'
-        'الإجمالي: ${money(total)} جنيه\n'
-        'المدفوع: ${money(paid)} جنيه\n'
-        'المتبقي: ${money(remaining)} جنيه\n'
-        'الملاحظات: $notes';
-
-    final Uri uri = Uri.parse(
-      'https://wa.me/$internationalNumber?text=${Uri.encodeComponent(message)}',
+    final int id =
+        await AppDatabase.addOrder(
+      <String, dynamic>{
+        'customer': customer.text.trim(),
+        'phone': phone.text.trim(),
+        'service': widget.service.name,
+        'quantity': quantityDescription(),
+        'details': widget.service.isBusinessCard
+            ? '$businessSide - ${details.text.trim()}'
+            : details.text.trim(),
+        'total': total,
+        'paid': paidValue,
+        'remaining': remaining,
+        'notes': notes.text.trim(),
+        'status': 'جديد',
+        'created_at':
+            DateTime.now().toIso8601String(),
+      },
     );
 
-    final bool opened = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
+    await widget.onOrderSaved();
 
-    if (!opened) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'تعذر فتح واتساب',
-              textAlign: TextAlign.center,
-            ),
-          ),
-        );
-      }
-    }
+    return id;
   }
 
-  void selectWhatsAppNumber(BuildContext context) {
-    if (!(formKey.currentState?.validate() ?? false)) {
+  Future<void> saveOnly() async {
+    final int? id = await saveOrder();
+
+    if (id == null || !mounted) {
       return;
     }
 
-    if (quantity <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'أدخل الكمية أولاً',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(25),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'تم حفظ الطلب رقم #$id',
+          textAlign: TextAlign.center,
         ),
       ),
+    );
+  }
+
+  Future<void> saveAndWhatsApp() async {
+    final int? id = await saveOrder();
+
+    if (id == null) {
+      return;
+    }
+
+    chooseWhatsApp(id);
+  }
+
+  void chooseWhatsApp(int orderId) {
+    showModalBottomSheet(
+      context: context,
       builder: (BuildContext sheetContext) {
         return Directionality(
           textDirection: TextDirection.rtl,
@@ -510,24 +688,24 @@ class _ServicePageState extends State<ServicePage> {
                   color: Colors.green,
                   size: 45,
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'إرسال الطلب إلى',
-                  style: TextStyle(
-                    fontSize: 23,
+                const SizedBox(height: 15),
+                Text(
+                  'إرسال الطلب #$orderId إلى',
+                  style: const TextStyle(
+                    fontSize: 21,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 whatsappButton(
                   sheetContext,
-                  context,
+                  orderId,
                   '0115494130',
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 whatsappButton(
                   sheetContext,
-                  context,
+                  orderId,
                   '0994482612',
                 ),
               ],
@@ -540,58 +718,89 @@ class _ServicePageState extends State<ServicePage> {
 
   Widget whatsappButton(
     BuildContext sheetContext,
-    BuildContext pageContext,
+    int orderId,
     String number,
   ) {
     return SizedBox(
       width: double.infinity,
-      height: 58,
       child: ElevatedButton.icon(
         onPressed: () {
-          Navigator.of(sheetContext).pop();
+          Navigator.pop(sheetContext);
 
           openWhatsApp(
-            pageContext,
+            orderId,
             number,
           );
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
+          padding:
+              const EdgeInsets.all(14),
         ),
         icon: const FaIcon(
           FontAwesomeIcons.whatsapp,
-          size: 24,
         ),
         label: Text(
           number,
-          style: const TextStyle(
-            fontSize: 21,
-          ),
+          style:
+              const TextStyle(fontSize: 19),
         ),
       ),
     );
   }
 
-  Widget inputField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType? keyboardType,
-    bool isRequired = false,
+  Future<void> openWhatsApp(
+    int orderId,
+    String localNumber,
+  ) async {
+    final String international =
+        localNumber == '0115494130'
+            ? '249115494130'
+            : '249994482612';
+
+    final String message =
+        'طلب جديد - غنجات للطباعة\n\n'
+        'رقم الطلب: #$orderId\n'
+        'الخدمة: ${widget.service.name}\n'
+        'العميل: ${customer.text.trim()}\n'
+        'الهاتف: ${phone.text.trim()}\n'
+        'الكمية: ${quantityDescription()}\n'
+        '${widget.service.isBusinessCard ? 'نوع الطباعة: $businessSide\n' : ''}'
+        'التفاصيل: ${details.text.trim()}\n'
+        'الإجمالي: ${money(total)} جنيه\n'
+        'المدفوع: ${money(paidValue)} جنيه\n'
+        'المتبقي: ${money(remaining)} جنيه\n'
+        'الحالة: جديد\n'
+        'الملاحظات: ${notes.text.trim()}';
+
+    final Uri uri = Uri.parse(
+      'https://wa.me/$international?text=${Uri.encodeComponent(message)}',
+    );
+
+    await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
+  Widget field(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    TextInputType? keyboard,
+    bool requiredField = false,
     ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
       controller: controller,
-      keyboardType: keyboardType,
+      keyboardType: keyboard,
       onChanged: onChanged,
-      validator: isRequired
+      validator: requiredField
           ? (String? value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'الرجاء إدخال $label';
+              if (value == null ||
+                  value.trim().isEmpty) {
+                return 'أدخل $label';
               }
 
               return null;
@@ -604,353 +813,68 @@ class _ServicePageState extends State<ServicePage> {
           color: GhanjatApp.turquoise,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
+          borderRadius:
+              BorderRadius.circular(15),
         ),
       ),
     );
-  }
-
-  Widget priceRow(
-    String title,
-    String value, {
-    bool important = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 5,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: <Widget>[
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: important ? 18 : 16,
-              fontWeight: important
-                  ? FontWeight.bold
-                  : FontWeight.normal,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: important ? 20 : 16,
-              fontWeight: FontWeight.bold,
-              color: important
-                  ? GhanjatApp.purple
-                  : Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    customerController.dispose();
-    phoneController.dispose();
-    quantityController.dispose();
-    sizeController.dispose();
-    paidController.dispose();
-    notesController.dispose();
-
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    String quantityLabel;
-
-    if (widget.service.isCardPack) {
-      quantityLabel = 'عدد الحزم - كل حزمة 100 كرت';
-    } else {
-      quantityLabel = 'الكمية بـ ${widget.service.unit}';
-    }
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: GhanjatApp.purple,
         foregroundColor: Colors.white,
-        centerTitle: true,
         title: Text(widget.service.name),
+        centerTitle: true,
       ),
-      body: SafeArea(
-        child: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Center(
-                  child: Container(
-                    width: 115,
-                    height: 115,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF2F8F7),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Icon(
-                      widget.service.icon,
-                      size: 58,
-                      color: GhanjatApp.turquoise,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  widget.service.name,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.service.description,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black54,
-                  ),
-                ),
-                const SizedBox(height: 18),
+      body: Form(
+        key: formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: <Widget>[
+              Icon(
+                widget.service.icon,
+                size: 70,
+                color: GhanjatApp.turquoise,
+              ),
 
-                if (widget.service.isBusinessCard)
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF2F8F7),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Column(
-                      children: <Widget>[
-                        const Text(
-                          'اختار نوع الطباعة',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        RadioListTile<String>(
-                          value: 'اتجاه واحد',
-                          groupValue: businessSide,
-                          title: const Text(
-                            'اتجاه واحد - 30,000 جنيه / 100 كرت',
-                          ),
-                          onChanged: (String? value) {
-                            if (value != null) {
-                              setState(() {
-                                businessSide = value;
-                              });
-                            }
-                          },
-                        ),
-                        RadioListTile<String>(
-                          value: 'اتجاهين',
-                          groupValue: businessSide,
-                          title: const Text(
-                            'اتجاهين - 35,000 جنيه / 100 كرت',
-                          ),
-                          onChanged: (String? value) {
-                            if (value != null) {
-                              setState(() {
-                                businessSide = value;
-                              });
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF2F8F7),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        const Text(
-                          'السعر',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${money(unitPrice)} جنيه / ${widget.service.unit}',
-                          style: const TextStyle(
-                            color: GhanjatApp.purple,
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              const SizedBox(height: 20),
 
-                const SizedBox(height: 22),
-
-                const Text(
-                  'بيانات الطلب',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 15),
-
-                inputField(
-                  controller: customerController,
-                  label: 'اسم العميل',
-                  icon: Icons.person_outline,
-                  isRequired: true,
-                ),
-
-                const SizedBox(height: 12),
-
-                inputField(
-                  controller: phoneController,
-                  label: 'رقم الهاتف',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                  isRequired: true,
-                ),
-
-                const SizedBox(height: 12),
-
-                inputField(
-                  controller: quantityController,
-                  label: quantityLabel,
-                  icon: Icons.numbers,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  isRequired: true,
-                  onChanged: (String value) {
-                    setState(() {});
-                  },
-                ),
-
-                const SizedBox(height: 12),
-
-                inputField(
-                  controller: sizeController,
-                  label: 'المقاس / تفاصيل إضافية',
-                  icon: Icons.straighten,
-                ),
-
-                const SizedBox(height: 12),
-
-                inputField(
-                  controller: paidController,
-                  label: 'المبلغ المدفوع',
-                  icon: Icons.payments_outlined,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  onChanged: (String value) {
-                    setState(() {});
-                  },
-                ),
-
-                const SizedBox(height: 12),
-
-                TextFormField(
-                  controller: notesController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: 'ملاحظات',
-                    prefixIcon: const Icon(
-                      Icons.notes,
-                      color: GhanjatApp.turquoise,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF2F8F7),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    children: <Widget>[
-                      priceRow(
-                        'الكمية',
-                        quantityText(),
+              if (widget.service.isBusinessCard)
+                Column(
+                  children: <Widget>[
+                    RadioListTile<String>(
+                      title: const Text(
+                        'اتجاه واحد - 30,000 / 100',
                       ),
-                      priceRow(
-                        'سعر الوحدة',
-                        '${money(unitPrice)} جنيه',
+                      value: 'اتجاه واحد',
+                      groupValue: businessSide,
+                      onChanged: (String? value) {
+                        if (value != null) {
+                          setState(() {
+                            businessSide = value;
+                          });
+                        }
+                      },
+                    ),
+                    RadioListTile<String>(
+                      title: const Text(
+                        'اتجاهين - 35,000 / 100',
                       ),
-                      const Divider(),
-                      priceRow(
-                        'الإجمالي',
-                        '${money(total)} جنيه',
-                        important: true,
-                      ),
-                      priceRow(
-                        'المدفوع',
-                        '${money(paid)} جنيه',
-                      ),
-                      priceRow(
-                        'المتبقي',
-                        '${money(remaining)} جنيه',
-                        important: true,
-                      ),
-                    ],
-                  ),
+                      value: 'اتجاهين',
+                      groupValue: businessSide,
+                      onChanged: (String? value) {
+                        if (value != null) {
+                          setState(() {
+                            businessSide = value;
+                          });
+                        }
+                      },
+                    ),
+                  ],
                 ),
 
-                const SizedBox(height: 22),
-
-                SizedBox(
-                  height: 62,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      selectWhatsAppNumber(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    icon: const FaIcon(
-                      FontAwesomeIcons.whatsapp,
-                      size: 27,
-                    ),
-                    label: const Text(
-                      'إرسال الطلب عبر واتساب',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+              const SizedBox(height: 10
