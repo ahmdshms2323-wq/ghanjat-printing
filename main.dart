@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:path/path.dart';
+import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -33,10 +33,6 @@ class GhanjatApp extends StatelessWidget {
   }
 }
 
-// =====================================================
-// قاعدة البيانات
-// =====================================================
-
 class AppDatabase {
   static Database? _database;
 
@@ -45,17 +41,16 @@ class AppDatabase {
       return _database!;
     }
 
-    final String dbPath = join(
+    final String dbPath = p.join(
       await getDatabasesPath(),
-      'ghanjat_orders_v2.db',
+      'ghanjat_orders.db',
     );
 
     _database = await openDatabase(
       dbPath,
       version: 1,
       onCreate: (Database db, int version) async {
-        await db.execute(
-          '''
+        await db.execute('''
           CREATE TABLE orders(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer TEXT NOT NULL,
@@ -70,8 +65,7 @@ class AppDatabase {
             status TEXT NOT NULL,
             created_at TEXT NOT NULL
           )
-          ''',
-        );
+        ''');
       },
     );
 
@@ -82,11 +76,7 @@ class AppDatabase {
     Map<String, dynamic> order,
   ) async {
     final Database db = await database;
-
-    return db.insert(
-      'orders',
-      order,
-    );
+    return db.insert('orders', order);
   }
 
   static Future<List<Map<String, dynamic>>> getOrders() async {
@@ -98,7 +88,7 @@ class AppDatabase {
     );
   }
 
-  static Future<void> changeStatus(
+  static Future<void> updateStatus(
     int id,
     String status,
   ) async {
@@ -125,25 +115,21 @@ class AppDatabase {
   }
 }
 
-// =====================================================
-// الخدمات والأسعار
-// =====================================================
-
 class ServiceData {
   final String name;
   final IconData icon;
   final String unit;
   final double price;
-  final bool businessCard;
-  final bool pack100;
+  final bool isBusinessCard;
+  final bool isPack100;
 
   const ServiceData({
     required this.name,
     required this.icon,
     required this.unit,
     required this.price,
-    this.businessCard = false,
-    this.pack100 = false,
+    this.isBusinessCard = false,
+    this.isPack100 = false,
   });
 }
 
@@ -153,8 +139,8 @@ const List<ServiceData> services = <ServiceData>[
     icon: Icons.badge_outlined,
     unit: '100 كرت',
     price: 30000,
-    businessCard: true,
-    pack100: true,
+    isBusinessCard: true,
+    isPack100: true,
   ),
   ServiceData(
     name: 'استيكرات منتجات',
@@ -185,13 +171,9 @@ const List<ServiceData> services = <ServiceData>[
     icon: Icons.card_giftcard_outlined,
     unit: '100 كرت',
     price: 70000,
-    pack100: true,
+    isPack100: true,
   ),
 ];
-
-// =====================================================
-// الصفحة الرئيسية
-// =====================================================
 
 class MainPage extends StatefulWidget {
   const MainPage({Key? key}) : super(key: key);
@@ -203,7 +185,7 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
-  int currentPage = 0;
+  int currentIndex = 0;
   bool loading = true;
 
   List<Map<String, dynamic>> orders =
@@ -216,7 +198,7 @@ class _MainPageState extends State<MainPage> {
   }
 
   Future<void> loadOrders() async {
-    final List<Map<String, dynamic>> result =
+    final List<Map<String, dynamic>> data =
         await AppDatabase.getOrders();
 
     if (!mounted) {
@@ -224,7 +206,7 @@ class _MainPageState extends State<MainPage> {
     }
 
     setState(() {
-      orders = result;
+      orders = data;
       loading = false;
     });
   }
@@ -233,7 +215,7 @@ class _MainPageState extends State<MainPage> {
     Navigator.of(context)
         .push(
       MaterialPageRoute<void>(
-        builder: (BuildContext context) {
+        builder: (BuildContext pageContext) {
           return Directionality(
             textDirection: TextDirection.rtl,
             child: OrderFormPage(
@@ -252,9 +234,9 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = <Widget>[
-      HomeContent(
+      HomePage(
         orders: orders,
-        onService: openService,
+        onServiceTap: openService,
       ),
       OrdersPage(
         orders: orders,
@@ -268,14 +250,14 @@ class _MainPageState extends State<MainPage> {
             ? const Center(
                 child: CircularProgressIndicator(),
               )
-            : pages[currentPage],
+            : pages[currentIndex],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: currentPage,
+        currentIndex: currentIndex,
         selectedItemColor: GhanjatApp.purple,
         onTap: (int index) {
           setState(() {
-            currentPage = index;
+            currentIndex = index;
           });
 
           if (index == 1) {
@@ -299,18 +281,14 @@ class _MainPageState extends State<MainPage> {
   }
 }
 
-// =====================================================
-// محتوى الرئيسية
-// =====================================================
-
-class HomeContent extends StatelessWidget {
+class HomePage extends StatelessWidget {
   final List<Map<String, dynamic>> orders;
-  final ValueChanged<ServiceData> onService;
+  final ValueChanged<ServiceData> onServiceTap;
 
-  const HomeContent({
+  const HomePage({
     Key? key,
     required this.orders,
-    required this.onService,
+    required this.onServiceTap,
   }) : super(key: key);
 
   String money(double value) {
@@ -324,10 +302,10 @@ class HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double remainingTotal = 0;
+    double totalRemaining = 0;
 
     for (final Map<String, dynamic> order in orders) {
-      remainingTotal +=
+      totalRemaining +=
           (order['remaining'] as num? ?? 0).toDouble();
     }
 
@@ -381,13 +359,11 @@ class HomeContent extends StatelessWidget {
                 ],
               ),
             ),
-
             const SizedBox(height: 18),
-
             Row(
               children: <Widget>[
                 Expanded(
-                  child: summaryCard(
+                  child: _summaryCard(
                     icon: Icons.receipt_long_outlined,
                     title: 'الطلبات',
                     value: '${orders.length}',
@@ -395,17 +371,16 @@ class HomeContent extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: summaryCard(
-                    icon: Icons.account_balance_wallet_outlined,
+                  child: _summaryCard(
+                    icon:
+                        Icons.account_balance_wallet_outlined,
                     title: 'المتبقي',
-                    value: '${money(remainingTotal)} ج',
+                    value: '${money(totalRemaining)} ج',
                   ),
                 ),
               ],
             ),
-
             const SizedBox(height: 25),
-
             const Text(
               'خدماتنا',
               style: TextStyle(
@@ -413,9 +388,7 @@ class HomeContent extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 12),
-
             ...services.map(
               (ServiceData service) {
                 return Padding(
@@ -423,7 +396,8 @@ class HomeContent extends StatelessWidget {
                   child: Card(
                     elevation: 1,
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
+                      contentPadding:
+                          const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 7,
                       ),
@@ -442,24 +416,21 @@ class HomeContent extends StatelessWidget {
                         ),
                       ),
                       subtitle: Text(
-                        service.businessCard
+                        service.isBusinessCard
                             ? '100 كرت: اتجاه واحد 30,000 • اتجاهين 35,000'
                             : '${money(service.price)} جنيه / ${service.unit}',
                       ),
-                      trailing: const Icon(
-                        Icons.chevron_left,
-                      ),
+                      trailing:
+                          const Icon(Icons.chevron_left),
                       onTap: () {
-                        onService(service);
+                        onServiceTap(service);
                       },
                     ),
                   ),
                 );
               },
             ),
-
             const SizedBox(height: 18),
-
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -483,7 +454,6 @@ class HomeContent extends StatelessWidget {
                 ],
               ),
             ),
-
             const SizedBox(height: 25),
           ],
         ),
@@ -491,7 +461,7 @@ class HomeContent extends StatelessWidget {
     );
   }
 
-  Widget summaryCard({
+  Widget _summaryCard({
     required IconData icon,
     required String title,
     required String value,
@@ -559,10 +529,6 @@ class ContactNumber extends StatelessWidget {
   }
 }
 
-// =====================================================
-// فورم إنشاء الطلب
-// =====================================================
-
 class OrderFormPage extends StatefulWidget {
   final ServiceData service;
   final Future<void> Function() onSaved;
@@ -602,25 +568,24 @@ class _OrderFormPageState extends State<OrderFormPage> {
       TextEditingController();
 
   String businessSide = 'اتجاه واحد';
-
   bool saving = false;
 
   double get quantity {
     return double.tryParse(
-          quantityController.text,
+          quantityController.text.trim(),
         ) ??
         0;
   }
 
   double get paid {
     return double.tryParse(
-          paidController.text,
+          paidController.text.trim(),
         ) ??
         0;
   }
 
   double get unitPrice {
-    if (widget.service.businessCard) {
+    if (widget.service.isBusinessCard) {
       if (businessSide == 'اتجاهين') {
         return 35000;
       }
@@ -655,16 +620,14 @@ class _OrderFormPageState extends State<OrderFormPage> {
   }
 
   String get quantityText {
-    if (widget.service.pack100) {
+    if (widget.service.isPack100) {
       final int cards = (quantity * 100).round();
-
       return '$cards كرت';
     }
 
-    final String amount =
-        quantity % 1 == 0
-            ? quantity.toStringAsFixed(0)
-            : quantity.toStringAsFixed(2);
+    final String amount = quantity % 1 == 0
+        ? quantity.toStringAsFixed(0)
+        : quantity.toStringAsFixed(2);
 
     return '$amount ${widget.service.unit}';
   }
@@ -675,14 +638,16 @@ class _OrderFormPageState extends State<OrderFormPage> {
     }
 
     if (quantity <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'الكمية لازم تكون أكبر من صفر',
-            textAlign: TextAlign.center,
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'الكمية لازم تكون أكبر من صفر',
+              textAlign: TextAlign.center,
+            ),
           ),
-        ),
-      );
+        );
+      }
 
       return null;
     }
@@ -693,7 +658,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
     String details = detailsController.text.trim();
 
-    if (widget.service.businessCard) {
+    if (widget.service.isBusinessCard) {
       if (details.isEmpty) {
         details = businessSide;
       } else {
@@ -713,19 +678,18 @@ class _OrderFormPageState extends State<OrderFormPage> {
         'remaining': remaining,
         'notes': notesController.text.trim(),
         'status': 'جديد',
-        'created_at': DateTime.now().toIso8601String(),
+        'created_at':
+            DateTime.now().toIso8601String(),
       },
     );
 
     await widget.onSaved();
 
-    if (!mounted) {
-      return id;
+    if (mounted) {
+      setState(() {
+        saving = false;
+      });
     }
-
-    setState(() {
-      saving = false;
-    });
 
     return id;
   }
@@ -754,10 +718,10 @@ class _OrderFormPageState extends State<OrderFormPage> {
       return;
     }
 
-    showWhatsAppNumbers(id);
+    _showWhatsAppNumbers(id);
   }
 
-  void showWhatsAppNumbers(int orderId) {
+  void _showWhatsAppNumbers(int orderId) {
     showModalBottomSheet<void>(
       context: context,
       builder: (BuildContext sheetContext) {
@@ -782,13 +746,13 @@ class _OrderFormPageState extends State<OrderFormPage> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                whatsappChoice(
+                _whatsappChoice(
                   sheetContext,
                   orderId,
                   '0115494130',
                 ),
                 const SizedBox(height: 10),
-                whatsappChoice(
+                _whatsappChoice(
                   sheetContext,
                   orderId,
                   '0994482612',
@@ -801,7 +765,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
     );
   }
 
-  Widget whatsappChoice(
+  Widget _whatsappChoice(
     BuildContext sheetContext,
     int orderId,
     String number,
@@ -812,7 +776,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
         onPressed: () {
           Navigator.of(sheetContext).pop();
 
-          openWhatsApp(
+          _openWhatsApp(
             orderId,
             number,
           );
@@ -833,11 +797,11 @@ class _OrderFormPageState extends State<OrderFormPage> {
     );
   }
 
-  Future<void> openWhatsApp(
+  Future<void> _openWhatsApp(
     int orderId,
     String localNumber,
   ) async {
-    final String international =
+    final String internationalNumber =
         localNumber == '0115494130'
             ? '249115494130'
             : '249994482612';
@@ -854,8 +818,9 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
     String printType = '';
 
-    if (widget.service.businessCard) {
-      printType = 'نوع الطباعة: $businessSide\n';
+    if (widget.service.isBusinessCard) {
+      printType =
+          'نوع الطباعة: $businessSide\n';
     }
 
     final String message =
@@ -874,7 +839,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
         'الملاحظات: $notes';
 
     final Uri uri = Uri.parse(
-      'https://wa.me/$international?text=${Uri.encodeComponent(message)}',
+      'https://wa.me/$internationalNumber?text=${Uri.encodeComponent(message)}',
     );
 
     await launchUrl(
@@ -883,7 +848,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
     );
   }
 
-  Widget textField({
+  Widget buildTextField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
@@ -897,7 +862,8 @@ class _OrderFormPageState extends State<OrderFormPage> {
       onChanged: onChanged,
       validator: requiredField
           ? (String? value) {
-              if (value == null || value.trim().isEmpty) {
+              if (value == null ||
+                  value.trim().isEmpty) {
                 return 'أدخل $label';
               }
 
@@ -923,16 +889,19 @@ class _OrderFormPageState extends State<OrderFormPage> {
     bool bold = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding:
+          const EdgeInsets.symmetric(vertical: 5),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment:
+            MainAxisAlignment.spaceBetween,
         children: <Widget>[
           Text(
             title,
             style: TextStyle(
               fontSize: 17,
-              fontWeight:
-                  bold ? FontWeight.bold : FontWeight.normal,
+              fontWeight: bold
+                  ? FontWeight.bold
+                  : FontWeight.normal,
             ),
           ),
           Text(
@@ -940,8 +909,9 @@ class _OrderFormPageState extends State<OrderFormPage> {
             style: TextStyle(
               fontSize: bold ? 19 : 17,
               fontWeight: FontWeight.bold,
-              color:
-                  bold ? GhanjatApp.purple : Colors.black87,
+              color: bold
+                  ? GhanjatApp.purple
+                  : Colors.black87,
             ),
           ),
         ],
@@ -975,7 +945,8 @@ class _OrderFormPageState extends State<OrderFormPage> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
             children: <Widget>[
               Center(
                 child: Container(
@@ -983,7 +954,8 @@ class _OrderFormPageState extends State<OrderFormPage> {
                   height: 110,
                   decoration: BoxDecoration(
                     color: GhanjatApp.light,
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius:
+                        BorderRadius.circular(30),
                   ),
                   child: Icon(
                     widget.service.icon,
@@ -992,9 +964,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 18),
-
               Text(
                 widget.service.name,
                 textAlign: TextAlign.center,
@@ -1003,14 +973,14 @@ class _OrderFormPageState extends State<OrderFormPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 15),
 
-              if (widget.service.businessCard)
+              if (widget.service.isBusinessCard)
                 Container(
                   decoration: BoxDecoration(
                     color: GhanjatApp.light,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius:
+                        BorderRadius.circular(18),
                   ),
                   child: Column(
                     children: <Widget>[
@@ -1051,10 +1021,12 @@ class _OrderFormPageState extends State<OrderFormPage> {
                 )
               else
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding:
+                      const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: GhanjatApp.light,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius:
+                        BorderRadius.circular(18),
                   ),
                   child: Text(
                     'السعر: ${money(unitPrice)} جنيه / ${widget.service.unit}',
@@ -1079,7 +1051,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
               const SizedBox(height: 15),
 
-              textField(
+              buildTextField(
                 controller: customerController,
                 label: 'اسم العميل',
                 icon: Icons.person_outline,
@@ -1088,7 +1060,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
               const SizedBox(height: 12),
 
-              textField(
+              buildTextField(
                 controller: phoneController,
                 label: 'رقم الهاتف',
                 icon: Icons.phone_outlined,
@@ -1098,13 +1070,15 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
               const SizedBox(height: 12),
 
-              textField(
+              buildTextField(
                 controller: quantityController,
-                label: widget.service.pack100
+                label: widget.service.isPack100
                     ? 'عدد الحزم - كل حزمة 100 كرت'
                     : 'الكمية بـ ${widget.service.unit}',
                 icon: Icons.numbers,
-                keyboardType: const TextInputType.numberWithOptions(
+                keyboardType:
+                    const TextInputType
+                        .numberWithOptions(
                   decimal: true,
                 ),
                 requiredField: true,
@@ -1115,7 +1089,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
               const SizedBox(height: 12),
 
-              textField(
+              buildTextField(
                 controller: detailsController,
                 label: 'المقاس / التفاصيل',
                 icon: Icons.straighten,
@@ -1123,11 +1097,13 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
               const SizedBox(height: 12),
 
-              textField(
+              buildTextField(
                 controller: paidController,
                 label: 'المبلغ المدفوع',
                 icon: Icons.payments_outlined,
-                keyboardType: const TextInputType.numberWithOptions(
+                keyboardType:
+                    const TextInputType
+                        .numberWithOptions(
                   decimal: true,
                 ),
                 onChanged: (String value) {
@@ -1147,7 +1123,8 @@ class _OrderFormPageState extends State<OrderFormPage> {
                     color: GhanjatApp.turquoise,
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius:
+                        BorderRadius.circular(15),
                   ),
                 ),
               ),
@@ -1158,7 +1135,8 @@ class _OrderFormPageState extends State<OrderFormPage> {
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: GhanjatApp.light,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius:
+                      BorderRadius.circular(20),
                 ),
                 child: Column(
                   children: <Widget>[
@@ -1187,15 +1165,21 @@ class _OrderFormPageState extends State<OrderFormPage> {
               SizedBox(
                 height: 58,
                 child: ElevatedButton.icon(
-                  onPressed: saving ? null : saveOnly,
+                  onPressed:
+                      saving ? null : saveOnly,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: GhanjatApp.purple,
-                    foregroundColor: Colors.white,
+                    backgroundColor:
+                        GhanjatApp.purple,
+                    foregroundColor:
+                        Colors.white,
                   ),
-                  icon: const Icon(Icons.save_outlined),
+                  icon: const Icon(
+                    Icons.save_outlined,
+                  ),
                   label: const Text(
                     'حفظ الطلب',
-                    style: TextStyle(fontSize: 19),
+                    style:
+                        TextStyle(fontSize: 19),
                   ),
                 ),
               ),
@@ -1205,17 +1189,21 @@ class _OrderFormPageState extends State<OrderFormPage> {
               SizedBox(
                 height: 58,
                 child: ElevatedButton.icon(
-                  onPressed: saving ? null : saveAndSend,
+                  onPressed:
+                      saving ? null : saveAndSend,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
+                    backgroundColor:
+                        Colors.green,
+                    foregroundColor:
+                        Colors.white,
                   ),
                   icon: const FaIcon(
                     FontAwesomeIcons.whatsapp,
                   ),
                   label: const Text(
                     'حفظ وإرسال عبر واتساب',
-                    style: TextStyle(fontSize: 18),
+                    style:
+                        TextStyle(fontSize: 18),
                   ),
                 ),
               ),
@@ -1228,10 +1216,6 @@ class _OrderFormPageState extends State<OrderFormPage> {
     );
   }
 }
-
-// =====================================================
-// صفحة الطلبات
-// =====================================================
 
 class OrdersPage extends StatelessWidget {
   final List<Map<String, dynamic>> orders;
@@ -1268,13 +1252,13 @@ class OrdersPage extends StatelessWidget {
     return Colors.grey;
   }
 
-  Future<void> changeStatus(
-    BuildContext context,
+  Future<void> showStatusPicker(
+    BuildContext pageContext,
     Map<String, dynamic> order,
   ) async {
     final String? newStatus =
         await showModalBottomSheet<String>(
-      context: context,
+      context: pageContext,
       builder: (BuildContext sheetContext) {
         return Directionality(
           textDirection: TextDirection.rtl,
@@ -1289,19 +1273,19 @@ class OrdersPage extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              statusItem(
+              _statusTile(
                 sheetContext,
                 'جديد',
               ),
-              statusItem(
+              _statusTile(
                 sheetContext,
                 'تحت التنفيذ',
               ),
-              statusItem(
+              _statusTile(
                 sheetContext,
                 'جاهز',
               ),
-              statusItem(
+              _statusTile(
                 sheetContext,
                 'تم التسليم',
               ),
@@ -1316,7 +1300,7 @@ class OrdersPage extends StatelessWidget {
       return;
     }
 
-    await AppDatabase.changeStatus(
+    await AppDatabase.updateStatus(
       order['id'] as int,
       newStatus,
     );
@@ -1324,8 +1308,8 @@ class OrdersPage extends StatelessWidget {
     await onRefresh();
   }
 
-  Widget statusItem(
-    BuildContext context,
+  Widget _statusTile(
+    BuildContext sheetContext,
     String status,
   ) {
     return ListTile(
@@ -1336,17 +1320,18 @@ class OrdersPage extends StatelessWidget {
       ),
       title: Text(status),
       onTap: () {
-        Navigator.of(context).pop(status);
+        Navigator.of(sheetContext).pop(status);
       },
     );
   }
 
-  Future<void> removeOrder(
-    BuildContext context,
+  Future<void> confirmDelete(
+    BuildContext pageContext,
     Map<String, dynamic> order,
   ) async {
-    final bool? confirm = await showDialog<bool>(
-      context: context,
+    final bool? confirmed =
+        await showDialog<bool>(
+      context: pageContext,
       builder: (BuildContext dialogContext) {
         return Directionality(
           textDirection: TextDirection.rtl,
@@ -1358,17 +1343,20 @@ class OrdersPage extends StatelessWidget {
             actions: <Widget>[
               TextButton(
                 onPressed: () {
-                  Navigator.of(dialogContext).pop(false);
+                  Navigator.of(dialogContext)
+                      .pop(false);
                 },
                 child: const Text('إلغاء'),
               ),
               TextButton(
                 onPressed: () {
-                  Navigator.of(dialogContext).pop(true);
+                  Navigator.of(dialogContext)
+                      .pop(true);
                 },
                 child: const Text(
                   'حذف',
-                  style: TextStyle(color: Colors.red),
+                  style:
+                      TextStyle(color: Colors.red),
                 ),
               ),
             ],
@@ -1377,7 +1365,7 @@ class OrdersPage extends StatelessWidget {
       },
     );
 
-    if (confirm != true) {
+    if (confirmed != true) {
       return;
     }
 
@@ -1392,7 +1380,8 @@ class OrdersPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: GhanjatApp.purple,
+        backgroundColor:
+            GhanjatApp.purple,
         foregroundColor: Colors.white,
         centerTitle: true,
         title: Text(
@@ -1403,45 +1392,55 @@ class OrdersPage extends StatelessWidget {
           ? const Center(
               child: Text(
                 'ما في طلبات محفوظة لسه',
-                style: TextStyle(fontSize: 18),
+                style:
+                    TextStyle(fontSize: 18),
               ),
             )
           : RefreshIndicator(
               onRefresh: onRefresh,
               child: ListView.builder(
-                padding: const EdgeInsets.all(12),
+                padding:
+                    const EdgeInsets.all(12),
                 itemCount: orders.length,
-                itemBuilder: (
-                  BuildContext context,
-                  int index,
-                ) {
-                  final Map<String, dynamic> order =
-                      orders[index];
+                itemBuilder:
+                    (BuildContext pageContext,
+                        int index) {
+                  final Map<String, dynamic>
+                      order = orders[index];
 
                   final double total =
-                      (order['total'] as num? ?? 0)
+                      (order['total']
+                                  as num? ??
+                              0)
                           .toDouble();
 
                   final double paid =
-                      (order['paid'] as num? ?? 0)
+                      (order['paid']
+                                  as num? ??
+                              0)
                           .toDouble();
 
                   final double remaining =
-                      (order['remaining'] as num? ?? 0)
+                      (order['remaining']
+                                  as num? ??
+                              0)
                           .toDouble();
 
                   final String status =
-                      order['status']?.toString() ??
+                      order['status']
+                              ?.toString() ??
                           'جديد';
 
                   return Card(
-                    margin: const EdgeInsets.only(
+                    margin:
+                        const EdgeInsets.only(
                       bottom: 12,
                     ),
                     child: ExpansionTile(
                       leading: CircleAvatar(
                         backgroundColor:
-                            GhanjatApp.turquoise,
+                            GhanjatApp
+                                .turquoise,
                         foregroundColor:
                             Colors.white,
                         child: Text(
@@ -1453,7 +1452,8 @@ class OrdersPage extends StatelessWidget {
                                 ?.toString() ??
                             '',
                         style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                          fontWeight:
+                              FontWeight.bold,
                         ),
                       ),
                       subtitle: Text(
@@ -1493,7 +1493,8 @@ class OrdersPage extends StatelessWidget {
                           ),
                         ListTile(
                           leading: const Icon(
-                            Icons.payments_outlined,
+                            Icons
+                                .payments_outlined,
                           ),
                           title: Text(
                             'الإجمالي: ${money(total)} جنيه',
@@ -1505,7 +1506,8 @@ class OrdersPage extends StatelessWidget {
                         ListTile(
                           leading: Icon(
                             Icons.circle,
-                            color: statusColor(status),
+                            color:
+                                statusColor(status),
                             size: 15,
                           ),
                           title: Text(
@@ -1513,7 +1515,9 @@ class OrdersPage extends StatelessWidget {
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(
+                          padding:
+                              const EdgeInsets
+                                  .fromLTRB(
                             12,
                             0,
                             12,
@@ -1522,17 +1526,19 @@ class OrdersPage extends StatelessWidget {
                           child: Row(
                             children: <Widget>[
                               Expanded(
-                                child: ElevatedButton.icon(
+                                child:
+                                    ElevatedButton.icon(
                                   onPressed: () {
-                                    changeStatus(
-                                      context,
+                                    showStatusPicker(
+                                      pageContext,
                                       order,
                                     );
                                   },
                                   icon: const Icon(
                                     Icons.sync,
                                   ),
-                                  label: const Text(
+                                  label:
+                                      const Text(
                                     'تغيير الحالة',
                                   ),
                                 ),
@@ -1540,13 +1546,14 @@ class OrdersPage extends StatelessWidget {
                               const SizedBox(width: 8),
                               IconButton(
                                 onPressed: () {
-                                  removeOrder(
-                                    context,
+                                  confirmDelete(
+                                    pageContext,
                                     order,
                                   );
                                 },
                                 icon: const Icon(
-                                  Icons.delete_outline,
+                                  Icons
+                                      .delete_outline,
                                   color: Colors.red,
                                 ),
                               ),
