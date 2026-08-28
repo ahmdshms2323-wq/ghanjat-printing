@@ -41,9 +41,7 @@ class AppDatabase {
   static Database? _db;
 
   static Future<Database> get database async {
-    if (_db != null) {
-      return _db!;
-    }
+    if (_db != null) return _db!;
 
     final String databasePath = p.join(
       await getDatabasesPath(),
@@ -162,9 +160,6 @@ const List<ServiceData> services = <ServiceData>[
     unit: 'متر',
     price: 40000,
   ),
-
-  // القسم الجديد:
-  // البلاستيك والقماش بقوا داخل قسم واحد.
   ServiceData(
     name: 'قسم الأكياس',
     icon: Icons.shopping_bag_outlined,
@@ -172,7 +167,6 @@ const List<ServiceData> services = <ServiceData>[
     price: 0,
     bagsCategory: true,
   ),
-
   ServiceData(
     name: 'لوحات إعلانية',
     icon: Icons.campaign_outlined,
@@ -196,9 +190,7 @@ class MainPage extends StatefulWidget {
   const MainPage({Key? key}) : super(key: key);
 
   @override
-  State<MainPage> createState() {
-    return _MainPageState();
-  }
+  State<MainPage> createState() => _MainPageState();
 }
 
 class _MainPageState extends State<MainPage> {
@@ -217,14 +209,26 @@ class _MainPageState extends State<MainPage> {
     final List<Map<String, dynamic>> data =
         await AppDatabase.getOrders();
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     setState(() {
       orders = data;
       loading = false;
     });
+  }
+
+  void goHome() {
+    setState(() {
+      currentIndex = 0;
+    });
+  }
+
+  void goOrders() {
+    setState(() {
+      currentIndex = 1;
+    });
+
+    loadOrders();
   }
 
   void openOrderForm(ServiceData service) {
@@ -247,8 +251,6 @@ class _MainPageState extends State<MainPage> {
     });
   }
 
-  // لو ضغط على قسم الأكياس:
-  // نظهر البلاستيك والقماش.
   void openService(ServiceData service) {
     if (service.bagsCategory) {
       showBagsPicker();
@@ -293,12 +295,7 @@ class _MainPageState extends State<MainPage> {
                   ),
                   const SizedBox(height: 18),
 
-                  // أكياس البلاستيك
                   ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
                     leading: const CircleAvatar(
                       backgroundColor: Color(0xFFF0FAF8),
                       child: Icon(
@@ -316,26 +313,16 @@ class _MainPageState extends State<MainPage> {
                     subtitle: const Text(
                       '25,000 جنيه / كيلو',
                     ),
-                    trailing: const Icon(
-                      Icons.chevron_left,
-                    ),
+                    trailing: const Icon(Icons.chevron_left),
                     onTap: () {
                       Navigator.of(sheetContext).pop();
-
-                      openOrderForm(
-                        plasticBagService,
-                      );
+                      openOrderForm(plasticBagService);
                     },
                   ),
 
                   const Divider(),
 
-                  // أكياس القماش
                   ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
                     leading: const CircleAvatar(
                       backgroundColor: Color(0xFFF0FAF8),
                       child: Icon(
@@ -353,15 +340,10 @@ class _MainPageState extends State<MainPage> {
                     subtitle: const Text(
                       '80,000 جنيه / كيلو',
                     ),
-                    trailing: const Icon(
-                      Icons.chevron_left,
-                    ),
+                    trailing: const Icon(Icons.chevron_left),
                     onTap: () {
                       Navigator.of(sheetContext).pop();
-
-                      openOrderForm(
-                        clothBagService,
-                      );
+                      openOrderForm(clothBagService);
                     },
                   ),
                 ],
@@ -419,10 +401,7 @@ class _MainPageState extends State<MainPage> {
                             Icons.chevron_left,
                           ),
                           onTap: () {
-                            Navigator.of(
-                              sheetContext,
-                            ).pop();
-
+                            Navigator.of(sheetContext).pop();
                             openService(service);
                           },
                         );
@@ -444,6 +423,7 @@ class _MainPageState extends State<MainPage> {
       HomeContent(
         orders: orders,
         onServiceTap: openService,
+        onOrdersTap: goOrders,
       ),
       OrdersPage(
         orders: orders,
@@ -464,31 +444,21 @@ class _MainPageState extends State<MainPage> {
         currentIndex: currentIndex,
         selectedItemColor: GhanjatApp.purple,
         onTap: (int index) {
-          setState(() {
-            currentIndex = index;
-          });
-
-          if (index == 1) {
-            loadOrders();
+          if (index == 0) {
+            goHome();
+          } else {
+            goOrders();
           }
         },
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.home_outlined,
-            ),
-            activeIcon: Icon(
-              Icons.home,
-            ),
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
             label: 'الرئيسية',
           ),
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.receipt_long_outlined,
-            ),
-            activeIcon: Icon(
-              Icons.receipt_long,
-            ),
+            icon: Icon(Icons.receipt_long_outlined),
+            activeIcon: Icon(Icons.receipt_long),
             label: 'الطلبات',
           ),
         ],
@@ -516,17 +486,19 @@ class _MainPageState extends State<MainPage> {
 }
 
 // ==========================================
-// محتوى الصفحة الرئيسية
+// الصفحة الرئيسية + القائمة الجانبية
 // ==========================================
 
 class HomeContent extends StatelessWidget {
   final List<Map<String, dynamic>> orders;
   final ValueChanged<ServiceData> onServiceTap;
+  final VoidCallback onOrdersTap;
 
   const HomeContent({
     Key? key,
     required this.orders,
     required this.onServiceTap,
+    required this.onOrdersTap,
   }) : super(key: key);
 
   String money(double value) {
@@ -536,15 +508,26 @@ class HomeContent extends StatelessWidget {
     );
   }
 
-  Future<void> openLink(
-    BuildContext context,
-    String link,
-  ) async {
+  Future<void> openLink(String link) async {
     final Uri uri = Uri.parse(link);
 
     await launchUrl(
       uri,
       mode: LaunchMode.externalApplication,
+    );
+  }
+
+  void drawerService(
+    BuildContext context,
+    ServiceData service,
+  ) {
+    Navigator.of(context).pop();
+
+    Future<void>.delayed(
+      const Duration(milliseconds: 150),
+      () async {
+        onServiceTap(service);
+      },
     );
   }
 
@@ -558,10 +541,212 @@ class HomeContent extends StatelessWidget {
     }
 
     return Scaffold(
+
+      // =====================================
+      // القائمة الجانبية ☰
+      // =====================================
+      drawer: Drawer(
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: <Widget>[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 28,
+                    horizontal: 18,
+                  ),
+                  color: GhanjatApp.purple,
+                  child: const Column(
+                    children: <Widget>[
+                      Icon(
+                        Icons.print,
+                        size: 55,
+                        color: Colors.white,
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'غنجات للطباعة',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                ListTile(
+                  leading: const Icon(
+                    Icons.home_outlined,
+                    color: GhanjatApp.purple,
+                  ),
+                  title: const Text(
+                    'الرئيسية',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+
+                const Divider(),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    'خدماتنا',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
+                ...services.map(
+                  (ServiceData service) {
+                    return ListTile(
+                      leading: Icon(
+                        service.icon,
+                        color: GhanjatApp.turquoise,
+                      ),
+                      title: Text(service.name),
+                      trailing: const Icon(
+                        Icons.chevron_left,
+                      ),
+                      onTap: () {
+                        drawerService(
+                          context,
+                          service,
+                        );
+                      },
+                    );
+                  },
+                ),
+
+                const Divider(),
+
+                ListTile(
+                  leading: const Icon(
+                    Icons.receipt_long_outlined,
+                    color: GhanjatApp.purple,
+                  ),
+                  title: const Text(
+                    'الطلبات',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${orders.length} طلب',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+
+                    Future<void>.delayed(
+                      const Duration(milliseconds: 150),
+                      () async {
+                        onOrdersTap();
+                      },
+                    );
+                  },
+                ),
+
+                const Divider(),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    'تواصل معنا',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
+                ListTile(
+                  leading: const FaIcon(
+                    FontAwesomeIcons.whatsapp,
+                    color: Colors.green,
+                  ),
+                  title: const Text(
+                    'واتساب 0115494130',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    openLink(
+                      'https://wa.me/249115494130',
+                    );
+                  },
+                ),
+
+                ListTile(
+                  leading: const FaIcon(
+                    FontAwesomeIcons.whatsapp,
+                    color: Colors.green,
+                  ),
+                  title: const Text(
+                    'واتساب 0994482612',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    openLink(
+                      'https://wa.me/249994482612',
+                    );
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(
+                    Icons.facebook,
+                    color: Color(0xFF1877F2),
+                  ),
+                  title: const Text('Facebook'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    openLink(
+                      'https://www.facebook.com/profile.php?id=61586164834127',
+                    );
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(
+                    Icons.music_note,
+                  ),
+                  title: const Text('TikTok'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    openLink(
+                      'https://www.tiktok.com/@ahmd01154?_r=1&_t=ZS-99CqrUgTisC',
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+
       appBar: AppBar(
         backgroundColor: GhanjatApp.purple,
         foregroundColor: Colors.white,
         centerTitle: true,
+
+        // زر ☰ بيظهر تلقائي لأن عندنا drawer
         title: const Text(
           'غنجات للطباعة',
           style: TextStyle(
@@ -578,48 +763,8 @@ class HomeContent extends StatelessWidget {
           105,
         ),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Container(
-              padding: const EdgeInsets.symmetric(
-                vertical: 28,
-                horizontal: 20,
-              ),
-              decoration: BoxDecoration(
-                color: GhanjatApp.turquoise,
-                borderRadius:
-                    BorderRadius.circular(35),
-              ),
-              child: const Column(
-                children: <Widget>[
-                  Icon(
-                    Icons.print,
-                    color: Colors.white,
-                    size: 64,
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    'غنجات',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    'لخدمات الطباعة',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
             Row(
               children: <Widget>[
                 Expanded(
@@ -664,8 +809,7 @@ class HomeContent extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: GhanjatApp.purple,
-                borderRadius:
-                    BorderRadius.circular(25),
+                borderRadius: BorderRadius.circular(25),
               ),
               child: const Column(
                 children: <Widget>[
@@ -695,12 +839,10 @@ class HomeContent extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: GhanjatApp.light,
-                borderRadius:
-                    BorderRadius.circular(25),
+                borderRadius: BorderRadius.circular(25),
               ),
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   const Text(
                     'تابعونا',
@@ -717,7 +859,6 @@ class HomeContent extends StatelessWidget {
                   ElevatedButton.icon(
                     onPressed: () {
                       openLink(
-                        context,
                         'https://www.facebook.com/profile.php?id=61586164834127',
                       );
                     },
@@ -725,8 +866,7 @@ class HomeContent extends StatelessWidget {
                       backgroundColor:
                           const Color(0xFF1877F2),
                       foregroundColor: Colors.white,
-                      padding:
-                          const EdgeInsets.symmetric(
+                      padding: const EdgeInsets.symmetric(
                         vertical: 14,
                       ),
                     ),
@@ -748,15 +888,13 @@ class HomeContent extends StatelessWidget {
                   ElevatedButton.icon(
                     onPressed: () {
                       openLink(
-                        context,
                         'https://www.tiktok.com/@ahmd01154?_r=1&_t=ZS-99CqrUgTisC',
                       );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
-                      padding:
-                          const EdgeInsets.symmetric(
+                      padding: const EdgeInsets.symmetric(
                         vertical: 14,
                       ),
                     ),
@@ -795,8 +933,7 @@ class HomeContent extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
-        mainAxisAlignment:
-            MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
           Icon(
             icon,
@@ -819,31 +956,25 @@ class HomeContent extends StatelessWidget {
     );
   }
 
-  Widget serviceCard(
-    ServiceData service,
-  ) {
+  Widget serviceCard(ServiceData service) {
     String subtitle;
 
     if (service.businessCard) {
       subtitle =
           '100 كرت\nاتجاه واحد: 30,000 ج\nاتجاهين: 35,000 ج';
     } else if (service.bagsCategory) {
-      subtitle =
-          'أكياس بلاستيك • أكياس قماش';
+      subtitle = 'أكياس بلاستيك • أكياس قماش';
     } else {
       subtitle =
           '${money(service.price)} جنيه / ${service.unit}';
     }
 
     return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 11,
-      ),
+      padding: const EdgeInsets.only(bottom: 11),
       child: Card(
         color: GhanjatApp.light,
         child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(
+          contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 10,
           ),
@@ -893,8 +1024,7 @@ class ContactNumber extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Row(
-        mainAxisAlignment:
-            MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
           const FaIcon(
             FontAwesomeIcons.whatsapp,
@@ -1020,8 +1150,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
   Widget businessGallery() {
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         const Text(
           'نماذج أعمالنا',
@@ -1036,15 +1165,13 @@ class _OrderFormPageState extends State<OrderFormPage> {
         Container(
           height: 230,
           decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(22),
             color: Colors.grey.shade100,
           ),
           clipBehavior: Clip.antiAlias,
           child: PageView.builder(
             controller: galleryController,
-            itemCount:
-                businessCardImages.length,
+            itemCount: businessCardImages.length,
             onPageChanged: (int index) {
               setState(() {
                 currentImage = index;
@@ -1066,28 +1193,21 @@ class _OrderFormPageState extends State<OrderFormPage> {
         const SizedBox(height: 12),
 
         Row(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: List<Widget>.generate(
             businessCardImages.length,
             (int index) {
               return Container(
-                width:
-                    currentImage == index
-                        ? 18
-                        : 8,
+                width: currentImage == index ? 18 : 8,
                 height: 8,
-                margin:
-                    const EdgeInsets.symmetric(
+                margin: const EdgeInsets.symmetric(
                   horizontal: 3,
                 ),
                 decoration: BoxDecoration(
-                  color:
-                      currentImage == index
-                          ? GhanjatApp.purple
-                          : Colors.grey.shade300,
-                  borderRadius:
-                      BorderRadius.circular(10),
+                  color: currentImage == index
+                      ? GhanjatApp.purple
+                      : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
                 ),
               );
             },
@@ -1109,28 +1229,22 @@ class _OrderFormPageState extends State<OrderFormPage> {
   }
 
   Future<int?> saveOrder() async {
-    if (!(formKey.currentState?.validate() ??
-        false)) {
+    if (!(formKey.currentState?.validate() ?? false)) {
       return null;
     }
 
-    final int id =
-        await AppDatabase.addOrder(
+    final int id = await AppDatabase.addOrder(
       <String, dynamic>{
-        'customer':
-            customerController.text.trim(),
-        'phone':
-            phoneController.text.trim(),
+        'customer': customerController.text.trim(),
+        'phone': phoneController.text.trim(),
         'service': widget.service.name,
         'quantity': quantityText,
-        'details':
-            detailsController.text.trim(),
+        'details': detailsController.text.trim(),
         'total': total,
         'paid': paid,
         'remaining': remaining,
         'status': 'جديد',
-        'notes':
-            notesController.text.trim(),
+        'notes': notesController.text.trim(),
         'created_at':
             DateTime.now().toIso8601String(),
       },
@@ -1142,8 +1256,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
   }
 
   Future<void> sendOrder() async {
-    final int? orderId =
-        await saveOrder();
+    final int? orderId = await saveOrder();
 
     if (orderId == null || !mounted) {
       return;
@@ -1151,17 +1264,13 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
     showModalBottomSheet<void>(
       context: context,
-      builder:
-          (BuildContext sheetContext) {
+      builder: (BuildContext sheetContext) {
         return Directionality(
-          textDirection:
-              TextDirection.rtl,
+          textDirection: TextDirection.rtl,
           child: Padding(
-            padding:
-                const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             child: Column(
-              mainAxisSize:
-                  MainAxisSize.min,
+              mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 const FaIcon(
                   FontAwesomeIcons.whatsapp,
@@ -1175,8 +1284,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
                   'إرسال الطلب إلى',
                   style: TextStyle(
                     fontSize: 21,
-                    fontWeight:
-                        FontWeight.bold,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
 
@@ -1212,21 +1320,17 @@ class _OrderFormPageState extends State<OrderFormPage> {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () {
-          Navigator.of(
-            sheetContext,
-          ).pop();
+          Navigator.of(sheetContext).pop();
 
           openWhatsApp(
             orderId,
             number,
           );
         },
-        style:
-            ElevatedButton.styleFrom(
+        style: ElevatedButton.styleFrom(
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
-          padding:
-              const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(14),
         ),
         icon: const FaIcon(
           FontAwesomeIcons.whatsapp,
@@ -1270,8 +1374,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
     await launchUrl(
       uri,
-      mode:
-          LaunchMode.externalApplication,
+      mode: LaunchMode.externalApplication,
     );
   }
 
@@ -1292,61 +1395,43 @@ class _OrderFormPageState extends State<OrderFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor:
-            GhanjatApp.purple,
+        backgroundColor: GhanjatApp.purple,
         foregroundColor: Colors.white,
         centerTitle: true,
-        title: Text(
-          widget.service.name,
-        ),
+        title: Text(widget.service.name),
       ),
 
       body: Form(
         key: formKey,
         child: SingleChildScrollView(
-          padding:
-              const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              if (widget
-                  .service.businessCard)
+              if (widget.service.businessCard)
                 businessGallery(),
 
-              if (widget
-                  .service.businessCard)
-                const SizedBox(
-                  height: 25,
-                ),
+              if (widget.service.businessCard)
+                const SizedBox(height: 25),
 
-              if (widget
-                  .service.businessCard)
+              if (widget.service.businessCard)
                 Container(
                   decoration: BoxDecoration(
                     color: GhanjatApp.light,
-                    borderRadius:
-                        BorderRadius.circular(
-                      18,
-                    ),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   child: Column(
                     children: <Widget>[
                       RadioListTile<String>(
-                        value:
-                            'اتجاه واحد',
-                        groupValue:
-                            businessSide,
+                        value: 'اتجاه واحد',
+                        groupValue: businessSide,
                         title: const Text(
                           'اتجاه واحد - 30,000 جنيه / 100 كرت',
                         ),
-                        onChanged:
-                            (String? value) {
-                          if (value !=
-                              null) {
+                        onChanged: (String? value) {
+                          if (value != null) {
                             setState(() {
-                              businessSide =
-                                  value;
+                              businessSide = value;
                             });
                           }
                         },
@@ -1354,18 +1439,14 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
                       RadioListTile<String>(
                         value: 'اتجاهين',
-                        groupValue:
-                            businessSide,
+                        groupValue: businessSide,
                         title: const Text(
                           'اتجاهين - 35,000 جنيه / 100 كرت',
                         ),
-                        onChanged:
-                            (String? value) {
-                          if (value !=
-                              null) {
+                        onChanged: (String? value) {
+                          if (value != null) {
                             setState(() {
-                              businessSide =
-                                  value;
+                              businessSide = value;
                             });
                           }
                         },
@@ -1375,27 +1456,17 @@ class _OrderFormPageState extends State<OrderFormPage> {
                 )
               else
                 Container(
-                  padding:
-                      const EdgeInsets.all(
-                    16,
-                  ),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: GhanjatApp.light,
-                    borderRadius:
-                        BorderRadius.circular(
-                      18,
-                    ),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   child: Text(
                     'السعر: ${money(unitPrice)} جنيه / ${widget.service.unit}',
-                    textAlign:
-                        TextAlign.center,
-                    style:
-                        const TextStyle(
-                      color:
-                          GhanjatApp.purple,
-                      fontWeight:
-                          FontWeight.bold,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: GhanjatApp.purple,
+                      fontWeight: FontWeight.bold,
                       fontSize: 17,
                     ),
                   ),
@@ -1416,8 +1487,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
                 phoneController,
                 'رقم الهاتف',
                 Icons.phone_outlined,
-                keyboardType:
-                    TextInputType.phone,
+                keyboardType: TextInputType.phone,
                 requiredField: true,
               ),
 
@@ -1430,13 +1500,11 @@ class _OrderFormPageState extends State<OrderFormPage> {
                     : 'الكمية بـ ${widget.service.unit}',
                 Icons.numbers,
                 keyboardType:
-                    const TextInputType
-                        .numberWithOptions(
+                    const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
                 requiredField: true,
-                onChanged:
-                    (String value) {
+                onChanged: (String value) {
                   setState(() {});
                 },
               ),
@@ -1456,12 +1524,10 @@ class _OrderFormPageState extends State<OrderFormPage> {
                 'المدفوع',
                 Icons.payments_outlined,
                 keyboardType:
-                    const TextInputType
-                        .numberWithOptions(
+                    const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                onChanged:
-                    (String value) {
+                onChanged: (String value) {
                   setState(() {});
                 },
               ),
@@ -1469,32 +1535,22 @@ class _OrderFormPageState extends State<OrderFormPage> {
               const SizedBox(height: 12),
 
               TextFormField(
-                controller:
-                    notesController,
+                controller: notesController,
                 maxLines: 3,
-                decoration:
-                    const InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'ملاحظات',
-                  border:
-                      OutlineInputBorder(),
-                  prefixIcon:
-                      Icon(Icons.notes),
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.notes),
                 ),
               ),
 
               const SizedBox(height: 18),
 
               Container(
-                padding:
-                    const EdgeInsets.all(
-                  18,
-                ),
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: GhanjatApp.light,
-                  borderRadius:
-                      BorderRadius.circular(
-                    18,
-                  ),
+                  borderRadius: BorderRadius.circular(18),
                 ),
                 child: Column(
                   children: <Widget>[
@@ -1520,16 +1576,10 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
               ElevatedButton.icon(
                 onPressed: sendOrder,
-                style:
-                    ElevatedButton.styleFrom(
-                  backgroundColor:
-                      Colors.green,
-                  foregroundColor:
-                      Colors.white,
-                  padding:
-                      const EdgeInsets.all(
-                    15,
-                  ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.all(15),
                 ),
                 icon: const FaIcon(
                   FontAwesomeIcons.whatsapp,
@@ -1575,8 +1625,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon),
-        border:
-            const OutlineInputBorder(),
+        border: const OutlineInputBorder(),
       ),
     );
   }
@@ -1608,11 +1657,8 @@ class _OrderFormPageState extends State<OrderFormPage> {
 // ==========================================
 
 class OrdersPage extends StatelessWidget {
-  final List<Map<String, dynamic>>
-      orders;
-
-  final Future<void> Function()
-      onRefresh;
+  final List<Map<String, dynamic>> orders;
+  final Future<void> Function() onRefresh;
 
   const OrdersPage({
     Key? key,
@@ -1621,13 +1667,9 @@ class OrdersPage extends StatelessWidget {
   }) : super(key: key);
 
   String money(double value) {
-    return value.toStringAsFixed(0)
-        .replaceAllMapped(
-      RegExp(
-        r'(\d)(?=(\d{3})+(?!\d))',
-      ),
-      (Match match) =>
-          '${match[1]},',
+    return value.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (Match match) => '${match[1]},',
     );
   }
 
@@ -1636,17 +1678,13 @@ class OrdersPage extends StatelessWidget {
     Map<String, dynamic> order,
   ) async {
     final String? status =
-        await showModalBottomSheet<
-            String>(
+        await showModalBottomSheet<String>(
       context: pageContext,
-      builder:
-          (BuildContext sheetContext) {
+      builder: (BuildContext sheetContext) {
         return Directionality(
-          textDirection:
-              TextDirection.rtl,
+          textDirection: TextDirection.rtl,
           child: Column(
-            mainAxisSize:
-                MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               statusItem(
                 sheetContext,
@@ -1687,9 +1725,7 @@ class OrdersPage extends StatelessWidget {
     return ListTile(
       title: Text(status),
       onTap: () {
-        Navigator.of(context).pop(
-          status,
-        );
+        Navigator.of(context).pop(status);
       },
     );
   }
@@ -1698,10 +1734,8 @@ class OrdersPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor:
-            GhanjatApp.purple,
-        foregroundColor:
-            Colors.white,
+        backgroundColor: GhanjatApp.purple,
+        foregroundColor: Colors.white,
         centerTitle: true,
         title: Text(
           'الطلبات (${orders.length})',
@@ -1720,65 +1754,49 @@ class OrdersPage extends StatelessWidget {
           : RefreshIndicator(
               onRefresh: onRefresh,
               child: ListView.builder(
-                padding:
-                    const EdgeInsets.all(
-                  12,
-                ),
-                itemCount:
-                    orders.length,
+                padding: const EdgeInsets.all(12),
+                itemCount: orders.length,
                 itemBuilder: (
-                  BuildContext
-                      pageContext,
+                  BuildContext pageContext,
                   int index,
                 ) {
-                  final Map<String,
-                          dynamic> order =
+                  final Map<String, dynamic> order =
                       orders[index];
 
                   return Card(
-                    child:
-                        ExpansionTile(
-                      leading:
-                          CircleAvatar(
+                    child: ExpansionTile(
+                      leading: CircleAvatar(
                         backgroundColor:
-                            GhanjatApp
-                                .turquoise,
-                        foregroundColor:
-                            Colors.white,
+                            GhanjatApp.turquoise,
+                        foregroundColor: Colors.white,
                         child: Text(
                           '${order['id']}',
                         ),
                       ),
+
                       title: Text(
-                        order['customer']
-                            .toString(),
-                        style:
-                            const TextStyle(
-                          fontWeight:
-                              FontWeight
-                                  .bold,
+                        order['customer'].toString(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
+
                       subtitle: Text(
                         '${order['service']} • ${order['status']}',
                       ),
-                      children:
-                          <Widget>[
+
+                      children: <Widget>[
                         ListTile(
-                          leading:
-                              const Icon(
-                            Icons
-                                .phone_outlined,
+                          leading: const Icon(
+                            Icons.phone_outlined,
                           ),
                           title: Text(
-                            order['phone']
-                                .toString(),
+                            order['phone'].toString(),
                           ),
                         ),
 
                         ListTile(
-                          leading:
-                              const Icon(
+                          leading: const Icon(
                             Icons.numbers,
                           ),
                           title: Text(
@@ -1787,10 +1805,8 @@ class OrdersPage extends StatelessWidget {
                         ),
 
                         ListTile(
-                          leading:
-                              const Icon(
-                            Icons
-                                .payments_outlined,
+                          leading: const Icon(
+                            Icons.payments_outlined,
                           ),
                           title: Text(
                             'الإجمالي: ${money((order['total'] as num).toDouble())} جنيه',
@@ -1801,29 +1817,20 @@ class OrdersPage extends StatelessWidget {
                         ),
 
                         Padding(
-                          padding:
-                              const EdgeInsets
-                                  .all(12),
-                          child:
-                              SizedBox(
-                            width: double
-                                .infinity,
-                            child:
-                                ElevatedButton
-                                    .icon(
-                              onPressed:
-                                  () {
+                          padding: const EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
                                 changeStatus(
                                   pageContext,
                                   order,
                                 );
                               },
-                              icon:
-                                  const Icon(
+                              icon: const Icon(
                                 Icons.sync,
                               ),
-                              label:
-                                  const Text(
+                              label: const Text(
                                 'تغيير حالة الطلب',
                               ),
                             ),
@@ -1838,3 +1845,4 @@ class OrdersPage extends StatelessWidget {
     );
   }
 }
+
