@@ -35,7 +35,7 @@ workflows:
           flutter pub add font_awesome_flutter
           flutter pub add sqflite
           flutter pub add path
-
+          flutter pub add image_picker
           flutter pub get
 
       - name: Build Android APK
