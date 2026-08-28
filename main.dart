@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -33,9 +36,9 @@ class GhanjatApp extends StatelessWidget {
   }
 }
 
-// ==========================================
+// ==================================================
 // قاعدة البيانات
-// ==========================================
+// ==================================================
 
 class AppDatabase {
   static Database? _db;
@@ -50,7 +53,10 @@ class AppDatabase {
 
     _db = await openDatabase(
       databasePath,
-      version: 1,
+
+      // تم رفع الإصدار من 1 إلى 2
+      version: 2,
+
       onCreate: (Database db, int version) async {
         await db.execute(
           '''
@@ -66,10 +72,34 @@ class AppDatabase {
             remaining REAL NOT NULL,
             status TEXT NOT NULL,
             notes TEXT,
+            payment_method TEXT,
+            transfer_last6 TEXT,
+            receipt_image TEXT,
             created_at TEXT NOT NULL
           )
           ''',
         );
+      },
+
+      // يحافظ على الطلبات القديمة
+      onUpgrade: (
+        Database db,
+        int oldVersion,
+        int newVersion,
+      ) async {
+        if (oldVersion < 2) {
+          await db.execute(
+            'ALTER TABLE orders ADD COLUMN payment_method TEXT',
+          );
+
+          await db.execute(
+            'ALTER TABLE orders ADD COLUMN transfer_last6 TEXT',
+          );
+
+          await db.execute(
+            'ALTER TABLE orders ADD COLUMN receipt_image TEXT',
+          );
+        }
       },
     );
 
@@ -80,7 +110,11 @@ class AppDatabase {
     Map<String, dynamic> data,
   ) async {
     final Database db = await database;
-    return db.insert('orders', data);
+
+    return db.insert(
+      'orders',
+      data,
+    );
   }
 
   static Future<List<Map<String, dynamic>>> getOrders() async {
@@ -109,15 +143,16 @@ class AppDatabase {
   }
 }
 
-// ==========================================
+// ==================================================
 // بيانات الخدمات
-// ==========================================
+// ==================================================
 
 class ServiceData {
   final String name;
   final IconData icon;
   final String unit;
   final double price;
+
   final bool businessCard;
   final bool pack100;
   final bool bagsCategory;
@@ -156,14 +191,12 @@ const List<ServiceData> services = <ServiceData>[
     businessCard: true,
     pack100: true,
   ),
-
   ServiceData(
     name: 'استيكرات منتجات',
     icon: Icons.label_outline,
     unit: 'متر',
     price: 40000,
   ),
-
   ServiceData(
     name: 'قسم الأكياس',
     icon: Icons.shopping_bag_outlined,
@@ -171,14 +204,12 @@ const List<ServiceData> services = <ServiceData>[
     price: 0,
     bagsCategory: true,
   ),
-
   ServiceData(
     name: 'لوحات إعلانية',
     icon: Icons.campaign_outlined,
     unit: 'متر',
     price: 35000,
   ),
-
   ServiceData(
     name: 'كروت الفال',
     icon: Icons.style_outlined,
@@ -188,9 +219,9 @@ const List<ServiceData> services = <ServiceData>[
   ),
 ];
 
-// ==========================================
+// ==================================================
 // الصفحة الأساسية
-// ==========================================
+// ==================================================
 
 class MainPage extends StatefulWidget {
   const MainPage({Key? key}) : super(key: key);
@@ -203,9 +234,6 @@ class _MainPageState extends State<MainPage> {
   int currentIndex = 0;
 
   bool loading = true;
-
-  // الجديد:
-  // نعرف هل القائمة مفتوحة أم لا
   bool drawerOpen = false;
 
   List<Map<String, dynamic>> orders =
@@ -297,9 +325,7 @@ class _MainPageState extends State<MainPage> {
                       color: GhanjatApp.purple,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   const Text(
                     'اختر نوع الأكياس',
                     style: TextStyle(
@@ -307,13 +333,11 @@ class _MainPageState extends State<MainPage> {
                       fontSize: 15,
                     ),
                   ),
-
                   const SizedBox(height: 18),
 
                   ListTile(
                     leading: const CircleAvatar(
-                      backgroundColor:
-                          Color(0xFFF0FAF8),
+                      backgroundColor: Color(0xFFF0FAF8),
                       child: Icon(
                         Icons.shopping_bag_outlined,
                         color: GhanjatApp.turquoise,
@@ -345,8 +369,7 @@ class _MainPageState extends State<MainPage> {
 
                   ListTile(
                     leading: const CircleAvatar(
-                      backgroundColor:
-                          Color(0xFFF0FAF8),
+                      backgroundColor: Color(0xFFF0FAF8),
                       child: Icon(
                         Icons.shopping_bag,
                         color: GhanjatApp.turquoise,
@@ -409,7 +432,6 @@ class _MainPageState extends State<MainPage> {
                         color: GhanjatApp.purple,
                       ),
                     ),
-
                     const SizedBox(height: 15),
 
                     ...services.map(
@@ -455,8 +477,6 @@ class _MainPageState extends State<MainPage> {
         orders: orders,
         onServiceTap: openService,
         onOrdersTap: goOrders,
-
-        // الجديد
         onDrawerChanged: (bool isOpen) {
           setState(() {
             drawerOpen = isOpen;
@@ -499,7 +519,6 @@ class _MainPageState extends State<MainPage> {
             ),
             label: 'الرئيسية',
           ),
-
           BottomNavigationBarItem(
             icon: Icon(
               Icons.receipt_long_outlined,
@@ -512,25 +531,19 @@ class _MainPageState extends State<MainPage> {
         ],
       ),
 
-      // الجديد:
-      // يظهر فقط لو القائمة مقفولة
       floatingActionButton:
           currentIndex == 0 && !drawerOpen
               ? FloatingActionButton.extended(
-                  backgroundColor:
-                      GhanjatApp.purple,
-                  foregroundColor:
-                      Colors.white,
-                  onPressed:
-                      showServicePicker,
+                  backgroundColor: GhanjatApp.purple,
+                  foregroundColor: Colors.white,
+                  onPressed: showServicePicker,
                   icon: const Icon(
                     Icons.add,
                   ),
                   label: const Text(
                     'طلب جديد',
                     style: TextStyle(
-                      fontWeight:
-                          FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 )
@@ -542,19 +555,17 @@ class _MainPageState extends State<MainPage> {
   }
 }
 
-// ==========================================
+// ==================================================
 // الصفحة الرئيسية + القائمة الجانبية
-// ==========================================
+// ==================================================
 
 class HomeContent extends StatelessWidget {
   final List<Map<String, dynamic>> orders;
 
-  final ValueChanged<ServiceData>
-      onServiceTap;
+  final ValueChanged<ServiceData> onServiceTap;
 
   final VoidCallback onOrdersTap;
 
-  // الجديد
   final ValueChanged<bool> onDrawerChanged;
 
   const HomeContent({
@@ -565,24 +576,12 @@ class HomeContent extends StatelessWidget {
     required this.onDrawerChanged,
   }) : super(key: key);
 
-  String money(double value) {
-    return value.toStringAsFixed(0).replaceAllMapped(
-      RegExp(
-        r'(\d)(?=(\d{3})+(?!\d))',
-      ),
-      (Match match) => '${match[1]},',
-    );
-  }
-
-  Future<void> openLink(
-    String link,
-  ) async {
+  Future<void> openLink(String link) async {
     final Uri uri = Uri.parse(link);
 
     await launchUrl(
       uri,
-      mode:
-          LaunchMode.externalApplication,
+      mode: LaunchMode.externalApplication,
     );
   }
 
@@ -593,9 +592,7 @@ class HomeContent extends StatelessWidget {
     Navigator.of(context).pop();
 
     Future<void>.delayed(
-      const Duration(
-        milliseconds: 150,
-      ),
+      const Duration(milliseconds: 150),
       () async {
         onServiceTap(service);
       },
@@ -604,55 +601,36 @@ class HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double remainingTotal = 0;
-
-    for (final Map<String, dynamic>
-        order in orders) {
-      remainingTotal +=
-          (order['remaining'] as num? ?? 0)
-              .toDouble();
-    }
-
     return Scaffold(
-
-      // الجديد:
-      // يبلغ MainPage لما القائمة تفتح أو تقفل
       onDrawerChanged: onDrawerChanged,
 
       drawer: Drawer(
         child: Directionality(
-          textDirection:
-              TextDirection.rtl,
+          textDirection: TextDirection.rtl,
           child: SafeArea(
             child: ListView(
               padding: EdgeInsets.zero,
               children: <Widget>[
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(
+                  padding: const EdgeInsets.symmetric(
                     vertical: 28,
                     horizontal: 18,
                   ),
-                  color:
-                      GhanjatApp.purple,
+                  color: GhanjatApp.purple,
                   child: const Column(
                     children: <Widget>[
                       Icon(
                         Icons.print,
-                        size: 55,
                         color: Colors.white,
+                        size: 58,
                       ),
-                      SizedBox(
-                        height: 10,
-                      ),
+                      SizedBox(height: 10),
                       Text(
                         'غنجات للطباعة',
                         style: TextStyle(
-                          color:
-                              Colors.white,
-                          fontSize: 24,
-                          fontWeight:
-                              FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
@@ -661,38 +639,32 @@ class HomeContent extends StatelessWidget {
 
                 ListTile(
                   leading: const Icon(
-                    Icons.home_outlined,
-                    color:
-                        GhanjatApp.purple,
+                    Icons.home,
+                    color: GhanjatApp.purple,
                   ),
                   title: const Text(
                     'الرئيسية',
                     style: TextStyle(
-                      fontWeight:
-                          FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   onTap: () {
-                    Navigator.of(context)
-                        .pop();
+                    Navigator.of(context).pop();
                   },
                 ),
 
                 const Divider(),
 
                 const Padding(
-                  padding:
-                      EdgeInsets.symmetric(
+                  padding: EdgeInsets.symmetric(
                     horizontal: 18,
                     vertical: 8,
                   ),
                   child: Text(
                     'خدماتنا',
                     style: TextStyle(
-                      color:
-                          Colors.black54,
-                      fontWeight:
-                          FontWeight.bold,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
@@ -702,15 +674,14 @@ class HomeContent extends StatelessWidget {
                     return ListTile(
                       leading: Icon(
                         service.icon,
-                        color: GhanjatApp
-                            .turquoise,
+                        color: GhanjatApp.turquoise,
                       ),
                       title: Text(
                         service.name,
                       ),
-                      trailing:
-                          const Icon(
+                      trailing: const Icon(
                         Icons.chevron_left,
+                        size: 20,
                       ),
                       onTap: () {
                         drawerService(
@@ -726,24 +697,28 @@ class HomeContent extends StatelessWidget {
 
                 ListTile(
                   leading: const Icon(
-                    Icons
-                        .receipt_long_outlined,
-                    color:
-                        GhanjatApp.purple,
+                    Icons.receipt_long,
+                    color: GhanjatApp.purple,
                   ),
                   title: const Text(
                     'الطلبات',
                     style: TextStyle(
-                      fontWeight:
-                          FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  subtitle: Text(
-                    '${orders.length} طلب',
+                  trailing: CircleAvatar(
+                    radius: 14,
+                    backgroundColor: GhanjatApp.purple,
+                    child: Text(
+                      '${orders.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
                   onTap: () {
-                    Navigator.of(context)
-                        .pop();
+                    Navigator.of(context).pop();
 
                     Future<void>.delayed(
                       const Duration(
@@ -759,35 +734,28 @@ class HomeContent extends StatelessWidget {
                 const Divider(),
 
                 const Padding(
-                  padding:
-                      EdgeInsets.symmetric(
+                  padding: EdgeInsets.symmetric(
                     horizontal: 18,
                     vertical: 8,
                   ),
                   child: Text(
                     'تواصل معنا',
                     style: TextStyle(
-                      color:
-                          Colors.black54,
-                      fontWeight:
-                          FontWeight.bold,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
 
                 ListTile(
                   leading: const FaIcon(
-                    FontAwesomeIcons
-                        .whatsapp,
+                    FontAwesomeIcons.whatsapp,
                     color: Colors.green,
                   ),
                   title: const Text(
-                    'واتساب 0115494130',
+                    '0115494130',
                   ),
                   onTap: () {
-                    Navigator.of(context)
-                        .pop();
-
                     openLink(
                       'https://wa.me/249115494130',
                     );
@@ -796,17 +764,13 @@ class HomeContent extends StatelessWidget {
 
                 ListTile(
                   leading: const FaIcon(
-                    FontAwesomeIcons
-                        .whatsapp,
+                    FontAwesomeIcons.whatsapp,
                     color: Colors.green,
                   ),
                   title: const Text(
-                    'واتساب 0994482612',
+                    '0994482612',
                   ),
                   onTap: () {
-                    Navigator.of(context)
-                        .pop();
-
                     openLink(
                       'https://wa.me/249994482612',
                     );
@@ -814,45 +778,23 @@ class HomeContent extends StatelessWidget {
                 ),
 
                 ListTile(
-                  leading: const Icon(
-                    Icons.facebook,
-                    color:
-                        Color(0xFF1877F2),
+                  leading: const FaIcon(
+                    FontAwesomeIcons.facebook,
                   ),
-                  title:
-                      const Text(
-                    'Facebook',
+                  title: const Text(
+                    'فيسبوك',
                   ),
-                  onTap: () {
-                    Navigator.of(context)
-                        .pop();
-
-                    openLink(
-                      'https://www.facebook.com/profile.php?id=61586164834127',
-                    );
-                  },
+                  onTap: () {},
                 ),
 
                 ListTile(
-                  leading: const Icon(
-                    Icons.music_note,
+                  leading: const FaIcon(
+                    FontAwesomeIcons.tiktok,
                   ),
-                  title:
-                      const Text(
-                    'TikTok',
+                  title: const Text(
+                    'تيك توك',
                   ),
-                  onTap: () {
-                    Navigator.of(context)
-                        .pop();
-
-                    openLink(
-                      'https://www.tiktok.com/@ahmd01154?_r=1&_t=ZS-99CqrUgTisC',
-                    );
-                  },
-                ),
-
-                const SizedBox(
-                  height: 20,
+                  onTap: () {},
                 ),
               ],
             ),
@@ -861,129 +803,198 @@ class HomeContent extends StatelessWidget {
       ),
 
       appBar: AppBar(
-        backgroundColor:
-            GhanjatApp.purple,
-        foregroundColor:
-            Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: GhanjatApp.purple,
+        elevation: 0,
         centerTitle: true,
         title: const Text(
           'غنجات للطباعة',
           style: TextStyle(
-            fontSize: 23,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ),
 
       body: SingleChildScrollView(
-        padding:
-            const EdgeInsets.fromLTRB(
-          20,
-          20,
-          20,
-          105,
+        padding: const EdgeInsets.fromLTRB(
+          16,
+          10,
+          16,
+          100,
         ),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: summaryCard(
-                    Icons
-                        .receipt_long_outlined,
-                    'الطلبات',
-                    '${orders.length}',
-                  ),
-                ),
-
-                const SizedBox(
-                  width: 12,
-                ),
-
-                Expanded(
-                  child: summaryCard(
-                    Icons
-                        .account_balance_wallet_outlined,
-                    'المتبقي',
-                    '${money(remainingTotal)} ج',
-                  ),
-                ),
-              ],
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset(
+                'ghanjat_banner.jpg',
+                fit: BoxFit.cover,
+                errorBuilder: (
+                  BuildContext context,
+                  Object error,
+                  StackTrace? stackTrace,
+                ) {
+                  return Container(
+                    height: 150,
+                    color: GhanjatApp.light,
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.print,
+                      size: 70,
+                      color: GhanjatApp.purple,
+                    ),
+                  );
+                },
+              ),
             ),
 
-            const SizedBox(
-              height: 28,
-            ),
+            const SizedBox(height: 22),
 
             const Text(
               'خدماتنا',
               style: TextStyle(
-                fontSize: 27,
-                fontWeight:
-                    FontWeight.bold,
+                fontSize: 23,
+                fontWeight: FontWeight.bold,
+                color: GhanjatApp.purple,
               ),
             ),
 
-            const SizedBox(
-              height: 14,
-            ),
+            const SizedBox(height: 14),
 
-            ...services.map(
-              (ServiceData service) {
-                return serviceCard(
-                  service,
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: services.length,
+              gridDelegate:
+                  const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.15,
+              ),
+              itemBuilder: (
+                BuildContext context,
+                int index,
+              ) {
+                final ServiceData service =
+                    services[index];
+
+                return InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () {
+                    onServiceTap(service);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: GhanjatApp.light,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFE9E0EF),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment:
+                          MainAxisAlignment.center,
+                      children: <Widget>[
+                        Icon(
+                          service.icon,
+                          size: 42,
+                          color: GhanjatApp.purple,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          service.name,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 );
               },
             ),
 
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 25),
 
             Container(
-              padding:
-                  const EdgeInsets.all(
-                20,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FAF8),
+                borderRadius: BorderRadius.circular(20),
               ),
-              decoration:
-                  BoxDecoration(
-                color:
-                    GhanjatApp.purple,
-                borderRadius:
-                    BorderRadius.circular(
-                  25,
-                ),
-              ),
-              child: const Column(
+              child: Column(
                 children: <Widget>[
-                  Text(
+                  const Text(
                     'تواصل معنا',
                     style: TextStyle(
-                      color:
-                          Colors.white,
-                      fontSize: 23,
-                      fontWeight:
-                          FontWeight.bold,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: GhanjatApp.purple,
                     ),
                   ),
+                  const SizedBox(height: 12),
 
-                  SizedBox(
-                    height: 15,
-                  ),
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                GhanjatApp.turquoise,
+                            foregroundColor:
+                                Colors.white,
+                            padding:
+                                const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
+                          ),
+                          onPressed: () {
+                            openLink(
+                              'https://wa.me/249115494130',
+                            );
+                          },
+                          icon: const FaIcon(
+                            FontAwesomeIcons.whatsapp,
+                          ),
+                          label: const Text(
+                            '0115494130',
+                          ),
+                        ),
+                      ),
 
-                  ContactNumber(
-                    number:
-                        '0115494130',
-                  ),
+                      const SizedBox(width: 10),
 
-                  SizedBox(
-                    height: 10,
-                  ),
-
-                  ContactNumber(
-                    number:
-                        '0994482612',
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                GhanjatApp.purple,
+                            foregroundColor:
+                                Colors.white,
+                            padding:
+                                const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
+                          ),
+                          onPressed: () {
+                            openLink(
+                              'https://wa.me/249994482612',
+                            );
+                          },
+                          icon: const FaIcon(
+                            FontAwesomeIcons.whatsapp,
+                          ),
+                          label: const Text(
+                            '0994482612',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -993,176 +1004,7 @@ class HomeContent extends StatelessWidget {
       ),
     );
   }
-
-  Widget summaryCard(
-    IconData icon,
-    String title,
-    String value,
-  ) {
-    return Container(
-      constraints:
-          const BoxConstraints(
-        minHeight: 125,
-      ),
-      padding:
-          const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: GhanjatApp.light,
-        borderRadius:
-            BorderRadius.circular(20),
-      ),
-      child: Column(
-        mainAxisAlignment:
-            MainAxisAlignment.center,
-        children: <Widget>[
-          Icon(
-            icon,
-            color:
-                GhanjatApp.turquoise,
-            size: 28,
-          ),
-
-          const SizedBox(
-            height: 6,
-          ),
-
-          Text(title),
-
-          const SizedBox(
-            height: 4,
-          ),
-
-          Text(
-            value,
-            style: const TextStyle(
-              color:
-                  GhanjatApp.purple,
-              fontWeight:
-                  FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget serviceCard(
-    ServiceData service,
-  ) {
-    String subtitle;
-
-    if (service.businessCard) {
-      subtitle =
-          '100 كرت\nاتجاه واحد: 30,000 ج\nاتجاهين: 35,000 ج';
-    } else if (service.bagsCategory) {
-      subtitle =
-          'أكياس بلاستيك • أكياس قماش';
-    } else {
-      subtitle =
-          '${money(service.price)} جنيه / ${service.unit}';
-    }
-
-    return Padding(
-      padding:
-          const EdgeInsets.only(
-        bottom: 11,
-      ),
-      child: Card(
-        color: GhanjatApp.light,
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 10,
-          ),
-          leading: CircleAvatar(
-            backgroundColor:
-                const Color(
-              0xFFF0FAF8,
-            ),
-            child: Icon(
-              service.icon,
-              color:
-                  GhanjatApp.turquoise,
-            ),
-          ),
-          title: Text(
-            service.name,
-            style:
-                const TextStyle(
-              fontSize: 18,
-              fontWeight:
-                  FontWeight.bold,
-            ),
-          ),
-          subtitle: Text(
-            subtitle,
-            style:
-                const TextStyle(
-              height: 1.45,
-            ),
-          ),
-          trailing:
-              const Icon(
-            Icons.chevron_left,
-          ),
-          onTap: () {
-            onServiceTap(service);
-          },
-        ),
-      ),
-    );
-  }
 }
-
-class ContactNumber
-    extends StatelessWidget {
-  final String number;
-
-  const ContactNumber({
-    Key? key,
-    required this.number,
-  }) : super(key: key);
-
-  @override
-  Widget build(
-    BuildContext context,
-  ) {
-    return Directionality(
-      textDirection:
-          TextDirection.ltr,
-      child: Row(
-        mainAxisAlignment:
-            MainAxisAlignment.center,
-        children: <Widget>[
-          const FaIcon(
-            FontAwesomeIcons
-                .whatsapp,
-            color:
-                Colors.greenAccent,
-            size: 25,
-          ),
-
-          const SizedBox(
-            width: 10,
-          ),
-
-          Text(
-            number,
-            style:
-                const TextStyle(
-              color:
-                  Colors.white,
-              fontSize: 21,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 
 class OrderFormPage extends StatefulWidget {
   final ServiceData service;
@@ -1175,19 +1017,11 @@ class OrderFormPage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<OrderFormPage> createState() {
-    return _OrderFormPageState();
-  }
+  State<OrderFormPage> createState() => _OrderFormPageState();
 }
 
 class _OrderFormPageState extends State<OrderFormPage> {
-  final GlobalKey<FormState> formKey =
-      GlobalKey<FormState>();
-
-  final PageController galleryController =
-      PageController();
-
-  int currentImage = 0;
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
   final TextEditingController customerController =
       TextEditingController();
@@ -1207,22 +1041,39 @@ class _OrderFormPageState extends State<OrderFormPage> {
   final TextEditingController notesController =
       TextEditingController();
 
+  final TextEditingController transferLast6Controller =
+      TextEditingController();
+
   String businessSide = 'اتجاه واحد';
 
-  final List<String> businessCardImages = <String>[
-    'assets/business_card/bc1.jpg',
-    'assets/business_card/bc2.jpg',
-    'assets/business_card/bc3.jpg',
-    'assets/business_card/bc4.jpg',
-    'assets/business_card/bc5.jpg',
-  ];
+  // في البداية ما في طريقة دفع مختارة
+  String? paymentMethod;
+
+  XFile? receiptImage;
+
+  bool saving = false;
+
+  // بيانات بنكك
+  static const String bankakAccount = '2769498';
+
+  // بيانات فوري
+  static const String fawryAccount = '51799301';
+
+  static const String accountName =
+      'احمد شمس الدين خالد احمد';
 
   double get quantity {
-    return double.tryParse(quantityController.text) ?? 0;
+    return double.tryParse(
+          quantityController.text.trim(),
+        ) ??
+        0;
   }
 
   double get paid {
-    return double.tryParse(paidController.text) ?? 0;
+    return double.tryParse(
+          paidController.text.trim(),
+        ) ??
+        0;
   }
 
   double get unitPrice {
@@ -1240,9 +1091,9 @@ class _OrderFormPageState extends State<OrderFormPage> {
   }
 
   double get remaining {
-    final double result = total - paid;
+    final double value = total - paid;
 
-    return result < 0 ? 0 : result;
+    return value < 0 ? 0 : value;
   }
 
   String money(double value) {
@@ -1260,84 +1111,80 @@ class _OrderFormPageState extends State<OrderFormPage> {
     return '$quantity ${widget.service.unit}';
   }
 
-  Widget businessGallery() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        const Text(
-          'نماذج أعمالنا',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+  String get selectedAccount {
+    if (paymentMethod == 'بنكك') {
+      return bankakAccount;
+    }
 
-        const SizedBox(height: 12),
+    if (paymentMethod == 'فوري') {
+      return fawryAccount;
+    }
 
-        Container(
-          height: 230,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            color: Colors.grey.shade100,
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: PageView.builder(
-            controller: galleryController,
-            itemCount: businessCardImages.length,
-            onPageChanged: (int index) {
-              setState(() {
-                currentImage = index;
-              });
-            },
-            itemBuilder: (
-              BuildContext context,
-              int index,
-            ) {
-              return Image.asset(
-                businessCardImages[index],
-                fit: BoxFit.cover,
-                width: double.infinity,
-              );
-            },
-          ),
-        ),
+    return '';
+  }
 
-        const SizedBox(height: 12),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List<Widget>.generate(
-            businessCardImages.length,
-            (int index) {
-              return Container(
-                width: currentImage == index ? 18 : 8,
-                height: 8,
-                margin: const EdgeInsets.symmetric(
-                  horizontal: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: currentImage == index
-                      ? GhanjatApp.purple
-                      : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              );
-            },
-          ),
-        ),
-
-        const SizedBox(height: 8),
-
-        const Text(
-          'اسحب يمين أو شمال لمشاهدة المزيد',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.black54,
-            fontSize: 13,
-          ),
-        ),
-      ],
+  void showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+      ),
     );
+  }
+
+  Future<void> pickReceipt() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (image == null || !mounted) {
+        return;
+      }
+
+      setState(() {
+        receiptImage = image;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      showMessage(
+        'تعذر اختيار الصورة، حاول مرة أخرى',
+      );
+    }
+  }
+
+  bool validatePayment() {
+    if (paymentMethod == null) {
+      showMessage(
+        'اختر طريقة الدفع: بنكك أو فوري',
+      );
+
+      return false;
+    }
+
+    final String last6 =
+        transferLast6Controller.text.trim();
+
+    if (!RegExp(r'^\d{6}$').hasMatch(last6)) {
+      showMessage(
+        'أدخل آخر 6 أرقام من عملية التحويل',
+      );
+
+      return false;
+    }
+
+    if (receiptImage == null) {
+      showMessage(
+        'ارفع صورة إشعار التحويل',
+      );
+
+      return false;
+    }
+
+    return true;
   }
 
   Future<int?> saveOrder() async {
@@ -1345,25 +1192,73 @@ class _OrderFormPageState extends State<OrderFormPage> {
       return null;
     }
 
-    final int id = await AppDatabase.addOrder(
-      <String, dynamic>{
-        'customer': customerController.text.trim(),
-        'phone': phoneController.text.trim(),
-        'service': widget.service.name,
-        'quantity': quantityText,
-        'details': detailsController.text.trim(),
-        'total': total,
-        'paid': paid,
-        'remaining': remaining,
-        'status': 'جديد',
-        'notes': notesController.text.trim(),
-        'created_at': DateTime.now().toIso8601String(),
-      },
-    );
+    if (!validatePayment()) {
+      return null;
+    }
 
-    await widget.onSaved();
+    if (saving) {
+      return null;
+    }
 
-    return id;
+    setState(() {
+      saving = true;
+    });
+
+    try {
+      final int id = await AppDatabase.addOrder(
+        <String, dynamic>{
+          'customer':
+              customerController.text.trim(),
+          'phone':
+              phoneController.text.trim(),
+          'service':
+              widget.service.name,
+          'quantity':
+              quantityText,
+          'details':
+              detailsController.text.trim(),
+          'total':
+              total,
+          'paid':
+              paid,
+          'remaining':
+              remaining,
+          'status':
+              'جديد',
+          'notes':
+              notesController.text.trim(),
+
+          // بيانات الدفع الجديدة
+          'payment_method':
+              paymentMethod,
+          'transfer_last6':
+              transferLast6Controller.text.trim(),
+          'receipt_image':
+              receiptImage?.path,
+
+          'created_at':
+              DateTime.now().toIso8601String(),
+        },
+      );
+
+      await widget.onSaved();
+
+      return id;
+    } catch (e) {
+      if (mounted) {
+        showMessage(
+          'حدث خطأ أثناء حفظ الطلب',
+        );
+      }
+
+      return null;
+    } finally {
+      if (mounted) {
+        setState(() {
+          saving = false;
+        });
+      }
+    }
   }
 
   Future<void> sendOrder() async {
@@ -1375,46 +1270,53 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
     showModalBottomSheet<void>(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(25),
+        ),
+      ),
       builder: (BuildContext sheetContext) {
         return Directionality(
           textDirection: TextDirection.rtl,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                const FaIcon(
-                  FontAwesomeIcons.whatsapp,
-                  color: Colors.green,
-                  size: 42,
-                ),
-
-                const SizedBox(height: 15),
-
-                const Text(
-                  'إرسال الطلب إلى',
-                  style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.bold,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const FaIcon(
+                    FontAwesomeIcons.whatsapp,
+                    color: Colors.green,
+                    size: 42,
                   ),
-                ),
 
-                const SizedBox(height: 16),
+                  const SizedBox(height: 15),
 
-                whatsappButton(
-                  sheetContext,
-                  orderId,
-                  '0115494130',
-                ),
+                  const Text(
+                    'إرسال الطلب إلى',
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
 
-                const SizedBox(height: 10),
+                  const SizedBox(height: 16),
 
-                whatsappButton(
-                  sheetContext,
-                  orderId,
-                  '0994482612',
-                ),
-              ],
+                  whatsappButton(
+                    sheetContext,
+                    orderId,
+                    '0115494130',
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  whatsappButton(
+                    sheetContext,
+                    orderId,
+                    '0994482612',
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -1430,6 +1332,11 @@ class _OrderFormPageState extends State<OrderFormPage> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.all(14),
+        ),
         onPressed: () {
           Navigator.of(sheetContext).pop();
 
@@ -1438,11 +1345,6 @@ class _OrderFormPageState extends State<OrderFormPage> {
             number,
           );
         },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.all(14),
-        ),
         icon: const FaIcon(
           FontAwesomeIcons.whatsapp,
         ),
@@ -1473,10 +1375,15 @@ class _OrderFormPageState extends State<OrderFormPage> {
         'اسم العميل: ${customerController.text.trim()}\n'
         'الهاتف: ${phoneController.text.trim()}\n'
         'الكمية: $quantityText\n'
-        'التفاصيل: ${detailsController.text.trim()}\n'
+        'التفاصيل: ${detailsController.text.trim()}\n\n'
         'الإجمالي: ${money(total)} جنيه\n'
         'المدفوع: ${money(paid)} جنيه\n'
-        'المتبقي: ${money(remaining)} جنيه\n'
+        'المتبقي: ${money(remaining)} جنيه\n\n'
+        'طريقة الدفع: $paymentMethod\n'
+        'رقم الحساب: $selectedAccount\n'
+        'اسم الحساب: $accountName\n'
+        'آخر 6 أرقام من التحويل: ${transferLast6Controller.text.trim()}\n'
+        'تم رفع صورة إشعار التحويل داخل الطلب\n\n'
         'الملاحظات: ${notesController.text.trim()}';
 
     final Uri uri = Uri.parse(
@@ -1489,15 +1396,392 @@ class _OrderFormPageState extends State<OrderFormPage> {
     );
   }
 
+  Widget paymentOption({
+    required String title,
+    required IconData icon,
+  }) {
+    final bool selected =
+        paymentMethod == title;
+
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () {
+          setState(() {
+            paymentMethod = title;
+
+            transferLast6Controller.clear();
+            receiptImage = null;
+          });
+        },
+        child: AnimatedContainer(
+          duration:
+              const Duration(milliseconds: 180),
+          padding:
+              const EdgeInsets.symmetric(
+            vertical: 18,
+            horizontal: 8,
+          ),
+          decoration: BoxDecoration(
+            color: selected
+                ? const Color(0xFFF0FAF8)
+                : Colors.white,
+            borderRadius:
+                BorderRadius.circular(18),
+            border: Border.all(
+              color: selected
+                  ? GhanjatApp.turquoise
+                  : Colors.grey.shade300,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: <Widget>[
+              Icon(
+                icon,
+                size: 31,
+                color: selected
+                    ? GhanjatApp.purple
+                    : Colors.grey.shade600,
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight:
+                      FontWeight.bold,
+                  color: selected
+                      ? GhanjatApp.purple
+                      : Colors.black87,
+                ),
+              ),
+
+              const SizedBox(height: 5),
+
+              Icon(
+                selected
+                    ? Icons.check_circle
+                    : Icons.radio_button_unchecked,
+                color: selected
+                    ? GhanjatApp.turquoise
+                    : Colors.grey,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget paymentSection() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: GhanjatApp.light,
+        borderRadius:
+            BorderRadius.circular(22),
+        border: Border.all(
+          color:
+              const Color(0xFFE4DCEA),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const Row(
+            children: <Widget>[
+              Icon(
+                Icons.account_balance_wallet_outlined,
+                color: GhanjatApp.purple,
+              ),
+
+              SizedBox(width: 8),
+
+              Text(
+                'طريقة الدفع',
+                style: TextStyle(
+                  fontSize: 21,
+                  fontWeight:
+                      FontWeight.bold,
+                  color:
+                      GhanjatApp.purple,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          const Text(
+            'اختر طريقة الدفع أولاً',
+            style: TextStyle(
+              color: Colors.black54,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          Row(
+            children: <Widget>[
+              paymentOption(
+                title: 'بنكك',
+                icon:
+                    Icons.account_balance_outlined,
+              ),
+
+              const SizedBox(width: 12),
+
+              paymentOption(
+                title: 'فوري',
+                icon:
+                    Icons.mobile_friendly_outlined,
+              ),
+            ],
+          ),
+
+          if (paymentMethod != null) ...<Widget>[
+            const SizedBox(height: 20),
+
+            AnimatedContainer(
+              duration:
+                  const Duration(milliseconds: 200),
+              padding:
+                  const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                    BorderRadius.circular(16),
+                border: Border.all(
+                  color:
+                      Colors.grey.shade200,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'بيانات حساب $paymentMethod',
+                    style:
+                        const TextStyle(
+                      fontSize: 18,
+                      fontWeight:
+                          FontWeight.bold,
+                      color:
+                          GhanjatApp.purple,
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  const Text(
+                    'رقم الحساب',
+                    style: TextStyle(
+                      color:
+                          Colors.black54,
+                    ),
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  Directionality(
+                    textDirection:
+                        TextDirection.ltr,
+                    child: SelectableText(
+                      selectedAccount,
+                      textAlign:
+                          TextAlign.right,
+                      style:
+                          const TextStyle(
+                        fontSize: 24,
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+                  ),
+
+                  const Divider(
+                    height: 25,
+                  ),
+
+                  const Text(
+                    'اسم الحساب',
+                    style: TextStyle(
+                      color:
+                          Colors.black54,
+                    ),
+                  ),
+
+                  const SizedBox(height: 5),
+
+                  const Text(
+                    accountName,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            TextFormField(
+              controller:
+                  transferLast6Controller,
+              keyboardType:
+                  TextInputType.number,
+              maxLength: 6,
+              decoration:
+                  const InputDecoration(
+                labelText:
+                    'آخر 6 أرقام من عملية التحويل',
+                hintText: 'مثال: 123456',
+                prefixIcon:
+                    Icon(
+                  Icons.pin_outlined,
+                ),
+                border:
+                    OutlineInputBorder(),
+                counterText: '',
+              ),
+              validator: (String? value) {
+                if (paymentMethod == null) {
+                  return null;
+                }
+
+                final String input =
+                    value?.trim() ?? '';
+
+                if (!RegExp(r'^\d{6}$')
+                    .hasMatch(input)) {
+                  return 'أدخل 6 أرقام بالضبط';
+                }
+
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 18),
+
+            const Text(
+              'صورة إشعار التحويل',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight:
+                    FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            OutlinedButton.icon(
+              style:
+                  OutlinedButton.styleFrom(
+                foregroundColor:
+                    GhanjatApp.purple,
+                padding:
+                    const EdgeInsets.symmetric(
+                  vertical: 15,
+                ),
+              ),
+              onPressed: pickReceipt,
+              icon: Icon(
+                receiptImage == null
+                    ? Icons
+                        .add_photo_alternate_outlined
+                    : Icons
+                        .change_circle_outlined,
+              ),
+              label: Text(
+                receiptImage == null
+                    ? 'رفع صورة إشعار التحويل'
+                    : 'تغيير صورة الإشعار',
+              ),
+            ),
+
+            if (receiptImage != null) ...<Widget>[
+              const SizedBox(height: 14),
+
+              Container(
+                height: 220,
+                decoration:
+                    BoxDecoration(
+                  color:
+                      Colors.grey.shade100,
+                  borderRadius:
+                      BorderRadius.circular(
+                    18,
+                  ),
+                  border: Border.all(
+                    color:
+                        Colors.grey.shade300,
+                  ),
+                ),
+                clipBehavior:
+                    Clip.antiAlias,
+                child: Image.file(
+                  File(receiptImage!.path),
+                  width: double.infinity,
+                  fit: BoxFit.contain,
+                  errorBuilder: (
+                    BuildContext context,
+                    Object error,
+                    StackTrace? stackTrace,
+                  ) {
+                    return const Center(
+                      child: Text(
+                        'تم اختيار صورة الإشعار',
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              const Row(
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
+                children: <Widget>[
+                  Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 19,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'تم رفع صورة الإشعار',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
-    galleryController.dispose();
     customerController.dispose();
     phoneController.dispose();
     quantityController.dispose();
     detailsController.dispose();
     paidController.dispose();
     notesController.dispose();
+    transferLast6Controller.dispose();
 
     super.dispose();
   }
@@ -1506,268 +1790,475 @@ class _OrderFormPageState extends State<OrderFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: GhanjatApp.purple,
-        foregroundColor: Colors.white,
+        backgroundColor:
+            GhanjatApp.purple,
+        foregroundColor:
+            Colors.white,
         centerTitle: true,
-        title: Text(widget.service.name),
+        title:
+            Text(widget.service.name),
       ),
 
       body: Form(
         key: formKey,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding:
+              const EdgeInsets.all(20),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
             children: <Widget>[
-              if (widget.service.businessCard)
-                businessGallery(),
-
-              if (widget.service.businessCard)
-                const SizedBox(height: 25),
-
-              if (widget.service.businessCard)
-                Container(
-                  decoration: BoxDecoration(
-                    color: GhanjatApp.light,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Column(
-                    children: <Widget>[
-                      RadioListTile<String>(
-                        value: 'اتجاه واحد',
-                        groupValue: businessSide,
-                        title: const Text(
-                          'اتجاه واحد - 30,000 جنيه / 100 كرت',
-                        ),
-                        onChanged: (String? value) {
-                          if (value != null) {
-                            setState(() {
-                              businessSide = value;
-                            });
-                          }
-                        },
-                      ),
-
-                      RadioListTile<String>(
-                        value: 'اتجاهين',
-                        groupValue: businessSide,
-                        title: const Text(
-                          'اتجاهين - 35,000 جنيه / 100 كرت',
-                        ),
-                        onChanged: (String? value) {
-                          if (value != null) {
-                            setState(() {
-                              businessSide = value;
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: GhanjatApp.light,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Text(
-                    'السعر: ${money(unitPrice)} جنيه / ${widget.service.unit}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: GhanjatApp.purple,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 17,
-                    ),
-                  ),
-                ),
-
-              const SizedBox(height: 20),
-
-              appField(
-                customerController,
-                'اسم العميل',
-                Icons.person_outline,
-                requiredField: true,
-              ),
-
-              const SizedBox(height: 12),
-
-              appField(
-                phoneController,
-                'رقم الهاتف',
-                Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-                requiredField: true,
-              ),
-
-              const SizedBox(height: 12),
-
-              appField(
-                quantityController,
-                widget.service.pack100
-                    ? 'عدد الحزم - كل حزمة 100 كرت'
-                    : 'الكمية بـ ${widget.service.unit}',
-                Icons.numbers,
-                keyboardType:
-                    const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                requiredField: true,
-                onChanged: (String value) {
-                  setState(() {});
-                },
-              ),
-
-              const SizedBox(height: 12),
-
-              appField(
-                detailsController,
-                'المقاس / التفاصيل',
-                Icons.straighten,
-              ),
-
-              const SizedBox(height: 12),
-
-              appField(
-                paidController,
-                'المدفوع',
-                Icons.payments_outlined,
-                keyboardType:
-                    const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                onChanged: (String value) {
-                  setState(() {});
-                },
-              ),
-
-              const SizedBox(height: 12),
-
-              TextFormField(
-                controller: notesController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'ملاحظات',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.notes),
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
               Container(
-                padding: const EdgeInsets.all(18),
+                padding:
+                    const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: GhanjatApp.light,
-                  borderRadius: BorderRadius.circular(18),
+                  color:
+                      GhanjatApp.light,
+                  borderRadius:
+                      BorderRadius.circular(
+                    20,
+                  ),
                 ),
-                child: Column(
+                child: Row(
                   children: <Widget>[
-                    amountRow(
-                      'الإجمالي',
-                      '${money(total)} جنيه',
+                    CircleAvatar(
+                      radius: 27,
+                      backgroundColor:
+                          const Color(
+                        0xFFF0FAF8,
+                      ),
+                      child: Icon(
+                        widget.service.icon,
+                        color:
+                            GhanjatApp.turquoise,
+                        size: 31,
+                      ),
                     ),
-                    const Divider(),
-                    amountRow(
-                      'المدفوع',
-                      '${money(paid)} جنيه',
-                    ),
-                    const Divider(),
-                    amountRow(
-                      'المتبقي',
-                      '${money(remaining)} جنيه',
+
+                    const SizedBox(width: 14),
+
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment
+                                .start,
+                        children: <Widget>[
+                          Text(
+                            widget.service.name,
+                            style:
+                                const TextStyle(
+                              fontSize: 21,
+                              fontWeight:
+                                  FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(
+                            height: 4,
+                          ),
+
+                          if (!widget
+                              .service
+                              .businessCard)
+                            Text(
+                              '${money(widget.service.price)} جنيه / ${widget.service.unit}',
+                              style:
+                                  const TextStyle(
+                                color:
+                                    Colors.black54,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
 
-              ElevatedButton.icon(
-                onPressed: sendOrder,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.all(15),
-                ),
-                icon: const FaIcon(
-                  FontAwesomeIcons.whatsapp,
-                ),
-                label: const Text(
-                  'حفظ وإرسال عبر واتساب',
+              if (widget.service.businessCard) ...<Widget>[
+                const Text(
+                  'نوع طباعة البزنس كارد',
                   style: TextStyle(
                     fontSize: 18,
+                    fontWeight:
+                        FontWeight.bold,
                   ),
+                ),
+
+                const SizedBox(height: 10),
+
+                DropdownButtonFormField<String>(
+                  value: businessSide,
+                  decoration:
+                      const InputDecoration(
+                    border:
+                        OutlineInputBorder(),
+                    prefixIcon: Icon(
+                      Icons.style_outlined,
+                    ),
+                  ),
+                  items:
+                      const <DropdownMenuItem<String>>[
+                    DropdownMenuItem<String>(
+                      value: 'اتجاه واحد',
+                      child: Text(
+                        'اتجاه واحد - 30,000 جنيه',
+                      ),
+                    ),
+                    DropdownMenuItem<String>(
+                      value: 'اتجاهين',
+                      child: Text(
+                        'اتجاهين - 35,000 جنيه',
+                      ),
+                    ),
+                  ],
+                  onChanged:
+                      (String? value) {
+                    if (value == null) return;
+
+                    setState(() {
+                      businessSide = value;
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 20),
+              ],
+
+              TextFormField(
+                controller:
+                    customerController,
+                textInputAction:
+                    TextInputAction.next,
+                decoration:
+                    const InputDecoration(
+                  labelText: 'اسم العميل',
+                  prefixIcon:
+                      Icon(
+                    Icons.person_outline,
+                  ),
+                  border:
+                      OutlineInputBorder(),
+                ),
+                validator:
+                    (String? value) {
+                  if (value == null ||
+                      value.trim().isEmpty) {
+                    return 'أدخل اسم العميل';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 15),
+
+              TextFormField(
+                controller:
+                    phoneController,
+                keyboardType:
+                    TextInputType.phone,
+                textInputAction:
+                    TextInputAction.next,
+                decoration:
+                    const InputDecoration(
+                  labelText: 'رقم الهاتف',
+                  prefixIcon:
+                      Icon(
+                    Icons.phone_outlined,
+                  ),
+                  border:
+                      OutlineInputBorder(),
+                ),
+                validator:
+                    (String? value) {
+                  if (value == null ||
+                      value.trim().isEmpty) {
+                    return 'أدخل رقم الهاتف';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 15),
+
+              TextFormField(
+                controller:
+                    quantityController,
+                keyboardType:
+                    const TextInputType
+                        .numberWithOptions(
+                  decimal: true,
+                ),
+                decoration:
+                    InputDecoration(
+                  labelText:
+                      widget.service.pack100
+                          ? 'عدد المجموعات - كل مجموعة 100 كرت'
+                          : 'الكمية (${widget.service.unit})',
+                  prefixIcon:
+                      const Icon(
+                    Icons.numbers,
+                  ),
+                  border:
+                      const OutlineInputBorder(),
+                ),
+                onChanged: (_) {
+                  setState(() {});
+                },
+                validator:
+                    (String? value) {
+                  final double? number =
+                      double.tryParse(
+                    value?.trim() ?? '',
+                  );
+
+                  if (number == null ||
+                      number <= 0) {
+                    return 'أدخل كمية صحيحة';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 15),
+
+              TextFormField(
+                controller:
+                    detailsController,
+                maxLines: 3,
+                decoration:
+                    const InputDecoration(
+                  labelText:
+                      'تفاصيل الطلب',
+                  hintText:
+                      'اكتب المقاس، اللون أو أي تفاصيل أخرى',
+                  prefixIcon:
+                      Icon(
+                    Icons.description_outlined,
+                  ),
+                  border:
+                      OutlineInputBorder(),
+                ),
+              ),
+
+              const SizedBox(height: 15),
+
+              TextFormField(
+                controller:
+                    paidController,
+                keyboardType:
+                    const TextInputType
+                        .numberWithOptions(
+                  decimal: true,
+                ),
+                decoration:
+                    const InputDecoration(
+                  labelText:
+                      'المبلغ المدفوع',
+                  prefixIcon:
+                      Icon(
+                    Icons.payments_outlined,
+                  ),
+                  border:
+                      OutlineInputBorder(),
+                ),
+                onChanged: (_) {
+                  setState(() {});
+                },
+                validator:
+                    (String? value) {
+                  final double? number =
+                      double.tryParse(
+                    value?.trim() ?? '',
+                  );
+
+                  if (number == null ||
+                      number < 0) {
+                    return 'أدخل مبلغ صحيح';
+                  }
+
+                  if (number > total) {
+                    return 'المبلغ المدفوع أكبر من إجمالي الطلب';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 15),
+
+              TextFormField(
+                controller:
+                    notesController,
+                maxLines: 3,
+                decoration:
+                    const InputDecoration(
+                  labelText:
+                      'ملاحظات إضافية',
+                  prefixIcon:
+                      Icon(
+                    Icons.note_alt_outlined,
+                  ),
+                  border:
+                      OutlineInputBorder(),
+                ),
+              ),
+
+              const SizedBox(height: 22),
+
+              // ملخص الحساب
+              Container(
+                padding:
+                    const EdgeInsets.all(18),
+                decoration:
+                    BoxDecoration(
+                  color:
+                      const Color(
+                    0xFFF0FAF8,
+                  ),
+                  borderRadius:
+                      BorderRadius.circular(
+                    20,
+                  ),
+                ),
+                child: Column(
+                  children: <Widget>[
+                    Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment
+                              .spaceBetween,
+                      children: <Widget>[
+                        const Text(
+                          'الإجمالي',
+                        ),
+                        Text(
+                          '${money(total)} جنيه',
+                          style:
+                              const TextStyle(
+                            fontWeight:
+                                FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const Divider(height: 24),
+
+                    Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment
+                              .spaceBetween,
+                      children: <Widget>[
+                        const Text(
+                          'المدفوع',
+                        ),
+                        Text(
+                          '${money(paid)} جنيه',
+                        ),
+                      ],
+                    ),
+
+                    const Divider(height: 24),
+
+                    Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment
+                              .spaceBetween,
+                      children: <Widget>[
+                        const Text(
+                          'المتبقي',
+                          style: TextStyle(
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${money(remaining)} جنيه',
+                          style:
+                              const TextStyle(
+                            fontWeight:
+                                FontWeight.bold,
+                            color:
+                                GhanjatApp.purple,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
 
               const SizedBox(height: 25),
+
+              // ==================================
+              // نظام الدفع
+              // ==================================
+
+              paymentSection(),
+
+              const SizedBox(height: 25),
+
+              ElevatedButton.icon(
+                style:
+                    ElevatedButton.styleFrom(
+                  backgroundColor:
+                      GhanjatApp.purple,
+                  foregroundColor:
+                      Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(
+                    vertical: 17,
+                  ),
+                ),
+                onPressed:
+                    saving ? null : sendOrder,
+                icon: saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child:
+                            CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const FaIcon(
+                        FontAwesomeIcons.whatsapp,
+                      ),
+                label: Text(
+                  saving
+                      ? 'جاري حفظ الطلب...'
+                      : 'تأكيد وإرسال الطلب',
+                  style:
+                      const TextStyle(
+                    fontSize: 18,
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 30),
             ],
           ),
         ),
       ),
     );
   }
-
-  Widget appField(
-    TextEditingController controller,
-    String label,
-    IconData icon, {
-    TextInputType? keyboardType,
-    bool requiredField = false,
-    ValueChanged<String>? onChanged,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      onChanged: onChanged,
-      validator: requiredField
-          ? (String? value) {
-              if (value == null ||
-                  value.trim().isEmpty) {
-                return 'أدخل $label';
-              }
-
-              return null;
-            }
-          : null,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: const OutlineInputBorder(),
-      ),
-    );
-  }
-
-  Widget amountRow(
-    String title,
-    String value,
-  ) {
-    return Row(
-      mainAxisAlignment:
-          MainAxisAlignment.spaceBetween,
-      children: <Widget>[
-        Text(title),
-        Text(
-          value,
-          style: const TextStyle(
-            color: GhanjatApp.purple,
-            fontWeight: FontWeight.bold,
-            fontSize: 17,
-          ),
-        ),
-      ],
-    );
-  }
 }
 
-// ==========================================
+// ==================================================
 // صفحة الطلبات
-// ==========================================
+// ==================================================
 
-class OrdersPage extends StatelessWidget {
+class OrdersPage extends StatefulWidget {
   final List<Map<String, dynamic>> orders;
   final Future<void> Function() onRefresh;
 
@@ -1777,67 +2268,186 @@ class OrdersPage extends StatelessWidget {
     required this.onRefresh,
   }) : super(key: key);
 
-  String money(double value) {
-    return value.toStringAsFixed(0).replaceAllMapped(
+  @override
+  State<OrdersPage> createState() =>
+      _OrdersPageState();
+}
+
+class _OrdersPageState
+    extends State<OrdersPage> {
+  String money(dynamic value) {
+    final double number =
+        (value as num? ?? 0).toDouble();
+
+    return number.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
       (Match match) => '${match[1]},',
     );
   }
 
+  Color statusColor(String status) {
+    switch (status) {
+      case 'تحت التنفيذ':
+        return Colors.orange;
+
+      case 'جاهز':
+        return Colors.blue;
+
+      case 'تم التسليم':
+        return Colors.green;
+
+      default:
+        return GhanjatApp.purple;
+    }
+  }
+
   Future<void> changeStatus(
-    BuildContext pageContext,
     Map<String, dynamic> order,
   ) async {
-    final String? status =
+    final String? result =
         await showModalBottomSheet<String>(
-      context: pageContext,
-      builder: (BuildContext sheetContext) {
+      context: context,
+      shape:
+          const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(
+          top: Radius.circular(25),
+        ),
+      ),
+      builder:
+          (BuildContext context) {
+        const List<String> statuses =
+            <String>[
+          'جديد',
+          'تحت التنفيذ',
+          'جاهز',
+          'تم التسليم',
+        ];
+
         return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              statusItem(
-                sheetContext,
-                'جديد',
+          textDirection:
+              TextDirection.rtl,
+          child: SafeArea(
+            child: Padding(
+              padding:
+                  const EdgeInsets.all(
+                20,
               ),
-              statusItem(
-                sheetContext,
-                'تحت التنفيذ',
+              child: Column(
+                mainAxisSize:
+                    MainAxisSize.min,
+                children: <Widget>[
+                  const Text(
+                    'تغيير حالة الطلب',
+                    style:
+                        TextStyle(
+                      fontSize: 21,
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 12,
+                  ),
+
+                  ...statuses.map(
+                    (String status) {
+                      return ListTile(
+                        leading: Icon(
+                          status ==
+                                  order[
+                                      'status']
+                              ? Icons
+                                  .radio_button_checked
+                              : Icons
+                                  .radio_button_unchecked,
+                          color:
+                              statusColor(
+                            status,
+                          ),
+                        ),
+                        title:
+                            Text(status),
+                        onTap: () {
+                          Navigator.of(
+                            context,
+                          ).pop(
+                            status,
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ],
               ),
-              statusItem(
-                sheetContext,
-                'جاهز',
-              ),
-              statusItem(
-                sheetContext,
-                'تم التسليم',
-              ),
-            ],
+            ),
           ),
         );
       },
     );
 
-    if (status != null) {
-      await AppDatabase.updateStatus(
-        order['id'] as int,
-        status,
-      );
+    if (result == null) return;
 
-      await onRefresh();
+    await AppDatabase.updateStatus(
+      order['id'] as int,
+      result,
+    );
+
+    await widget.onRefresh();
+
+    if (mounted) {
+      setState(() {});
     }
   }
 
-  Widget statusItem(
-    BuildContext context,
-    String status,
+  Widget receiptPreview(
+    String? path,
   ) {
-    return ListTile(
-      title: Text(status),
-      onTap: () {
-        Navigator.of(context).pop(status);
-      },
+    if (path == null ||
+        path.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final File file = File(path);
+
+    if (!file.existsSync()) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding:
+          const EdgeInsets.only(
+        top: 12,
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'إشعار التحويل',
+            style: TextStyle(
+              fontWeight:
+                  FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          ClipRRect(
+            borderRadius:
+                BorderRadius.circular(
+              14,
+            ),
+            child: Image.file(
+              file,
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1845,105 +2455,329 @@ class OrdersPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: GhanjatApp.purple,
-        foregroundColor: Colors.white,
+        backgroundColor:
+            GhanjatApp.purple,
+        foregroundColor:
+            Colors.white,
+        automaticallyImplyLeading:
+            false,
         centerTitle: true,
-        title: Text(
-          'الطلبات (${orders.length})',
+        title: const Text(
+          'الطلبات',
+          style: TextStyle(
+            fontWeight:
+                FontWeight.bold,
+          ),
         ),
+        actions: <Widget>[
+          IconButton(
+            onPressed:
+                widget.onRefresh,
+            icon:
+                const Icon(
+              Icons.refresh,
+            ),
+          ),
+        ],
       ),
 
-      body: orders.isEmpty
+      body: widget.orders.isEmpty
           ? const Center(
-              child: Text(
-                'ما في طلبات محفوظة لسه',
-                style: TextStyle(
-                  fontSize: 18,
-                ),
+              child: Column(
+                mainAxisSize:
+                    MainAxisSize.min,
+                children: <Widget>[
+                  Icon(
+                    Icons
+                        .receipt_long_outlined,
+                    size: 65,
+                    color:
+                        Colors.grey,
+                  ),
+
+                  SizedBox(
+                    height: 12,
+                  ),
+
+                  Text(
+                    'ما في طلبات لسه',
+                    style:
+                        TextStyle(
+                      fontSize: 19,
+                      color:
+                          Colors.black54,
+                    ),
+                  ),
+                ],
               ),
             )
           : RefreshIndicator(
-              onRefresh: onRefresh,
+              onRefresh:
+                  widget.onRefresh,
               child: ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: orders.length,
+                padding:
+                    const EdgeInsets.fromLTRB(
+                  14,
+                  14,
+                  14,
+                  100,
+                ),
+                itemCount:
+                    widget.orders.length,
                 itemBuilder: (
-                  BuildContext pageContext,
+                  BuildContext context,
                   int index,
                 ) {
-                  final Map<String, dynamic> order =
-                      orders[index];
+                  final Map<String, dynamic>
+                      order =
+                      widget.orders[index];
+
+                  final String status =
+                      order['status']
+                              ?.toString() ??
+                          'جديد';
+
+                  final String
+                      paymentMethod =
+                      order['payment_method']
+                              ?.toString() ??
+                          '';
+
+                  final String last6 =
+                      order['transfer_last6']
+                              ?.toString() ??
+                          '';
+
+                  final String
+                      receiptPath =
+                      order['receipt_image']
+                              ?.toString() ??
+                          '';
 
                   return Card(
-                    child: ExpansionTile(
-                      leading: CircleAvatar(
+                    margin:
+                        const EdgeInsets.only(
+                      bottom: 12,
+                    ),
+                    child:
+                        ExpansionTile(
+                      leading:
+                          CircleAvatar(
                         backgroundColor:
-                            GhanjatApp.turquoise,
-                        foregroundColor: Colors.white,
+                            GhanjatApp
+                                .light,
                         child: Text(
-                          '${order['id']}',
+                          '#${order['id']}',
+                          style:
+                              const TextStyle(
+                            color:
+                                GhanjatApp
+                                    .purple,
+                            fontSize: 12,
+                            fontWeight:
+                                FontWeight
+                                    .bold,
+                          ),
                         ),
                       ),
 
                       title: Text(
-                        order['customer'].toString(),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                        order['customer']
+                                ?.toString() ??
+                            '',
+                        style:
+                            const TextStyle(
+                          fontWeight:
+                              FontWeight.bold,
                         ),
                       ),
 
                       subtitle: Text(
-                        '${order['service']} • ${order['status']}',
+                        order['service']
+                                ?.toString() ??
+                            '',
                       ),
 
-                      children: <Widget>[
+                      trailing:
+                          Container(
+                        padding:
+                            const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 6,
+                        ),
+                        decoration:
+                            BoxDecoration(
+                          color:
+                              statusColor(
+                                    status,
+                                  )
+                                  .withOpacity(
+                            0.12,
+                          ),
+                          borderRadius:
+                              BorderRadius.circular(
+                            12,
+                          ),
+                        ),
+                        child: Text(
+                          status,
+                          style:
+                              TextStyle(
+                            color:
+                                statusColor(
+                              status,
+                            ),
+                            fontWeight:
+                                FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+
+                      childrenPadding:
+                          const EdgeInsets.fromLTRB(
+                        16,
+                        0,
+                        16,
+                        18,
+                      ),
+
+                      children:
+                          <Widget>[
+                        const Divider(),
+
                         ListTile(
-                          leading: const Icon(
-                            Icons.phone_outlined,
+                          dense: true,
+                          leading:
+                              const Icon(
+                            Icons
+                                .phone_outlined,
                           ),
                           title: Text(
-                            order['phone'].toString(),
+                            'الهاتف: ${order['phone'] ?? ''}',
                           ),
                         ),
 
                         ListTile(
-                          leading: const Icon(
-                            Icons.numbers,
+                          dense: true,
+                          leading:
+                              const Icon(
+                            Icons
+                                .inventory_2_outlined,
                           ),
                           title: Text(
-                            'الكمية: ${order['quantity']}',
+                            'الكمية: ${order['quantity'] ?? ''}',
                           ),
                         ),
 
                         ListTile(
-                          leading: const Icon(
-                            Icons.payments_outlined,
+                          dense: true,
+                          leading:
+                              const Icon(
+                            Icons
+                                .payments_outlined,
                           ),
                           title: Text(
-                            'الإجمالي: ${money((order['total'] as num).toDouble())} جنيه',
+                            'الإجمالي: ${money(order['total'])} جنيه',
                           ),
                           subtitle: Text(
-                            'المدفوع: ${money((order['paid'] as num).toDouble())} • المتبقي: ${money((order['remaining'] as num).toDouble())}',
+                            'المدفوع: ${money(order['paid'])} جنيه\n'
+                            'المتبقي: ${money(order['remaining'])} جنيه',
                           ),
                         ),
 
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                changeStatus(
-                                  pageContext,
-                                  order,
-                                );
-                              },
-                              icon: const Icon(
-                                Icons.sync,
+                        if (paymentMethod
+                            .isNotEmpty)
+                          Container(
+                            width:
+                                double.infinity,
+                            margin:
+                                const EdgeInsets.only(
+                              top: 8,
+                            ),
+                            padding:
+                                const EdgeInsets.all(
+                              14,
+                            ),
+                            decoration:
+                                BoxDecoration(
+                              color:
+                                  const Color(
+                                0xFFF0FAF8,
                               ),
-                              label: const Text(
-                                'تغيير حالة الطلب',
+                              borderRadius:
+                                  BorderRadius.circular(
+                                15,
                               ),
+                            ),
+                            child:
+                                Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment
+                                      .start,
+                              children:
+                                  <Widget>[
+                                const Text(
+                                  'بيانات الدفع',
+                                  style:
+                                      TextStyle(
+                                    color:
+                                        GhanjatApp
+                                            .purple,
+                                    fontWeight:
+                                        FontWeight
+                                            .bold,
+                                    fontSize:
+                                        17,
+                                  ),
+                                ),
+
+                                const SizedBox(
+                                  height: 8,
+                                ),
+
+                                Text(
+                                  'طريقة الدفع: $paymentMethod',
+                                ),
+
+                                const SizedBox(
+                                  height: 4,
+                                ),
+
+                                Text(
+                                  'آخر 6 أرقام: $last6',
+                                ),
+
+                                receiptPreview(
+                                  receiptPath,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        const SizedBox(
+                          height: 12,
+                        ),
+
+                        SizedBox(
+                          width:
+                              double.infinity,
+                          child:
+                              OutlinedButton.icon(
+                            onPressed:
+                                () {
+                              changeStatus(
+                                order,
+                              );
+                            },
+                            icon:
+                                const Icon(
+                              Icons
+                                  .edit_outlined,
+                            ),
+                            label:
+                                const Text(
+                              'تغيير حالة الطلب',
                             ),
                           ),
                         ),
